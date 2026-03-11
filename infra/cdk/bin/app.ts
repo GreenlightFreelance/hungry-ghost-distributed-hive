@@ -5,6 +5,7 @@ import { EcsStack } from '../lib/ecs-stack';
 import { EventBridgeStack } from '../lib/eventbridge-stack';
 import { FrontendStack } from '../lib/frontend-stack';
 import { IamStack } from '../lib/iam-stack';
+import { MonitoringStack } from '../lib/monitoring-stack';
 import { SqsStack } from '../lib/sqs-stack';
 import { StorageStack } from '../lib/storage-stack';
 import { VpcStack } from '../lib/vpc-stack';
@@ -70,5 +71,11 @@ const eventBridgeStack = new EventBridgeStack(app, 'DistributedHiveEventBridge',
 eventBridgeStack.addDependency(apiStack);
 
 const frontendStack = new FrontendStack(app, 'DistributedHiveFrontend', { env });
+
+const monitoringStack = new MonitoringStack(app, 'DistributedHiveMonitoring', {
+  env,
+  clusterName: ecsStack.cluster.clusterName,
+});
+monitoringStack.addDependency(ecsStack);
 
 app.synth();
