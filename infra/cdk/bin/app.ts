@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
+import { ApiStack } from '../lib/api-stack';
 import { EcsStack } from '../lib/ecs-stack';
+import { EventBridgeStack } from '../lib/eventbridge-stack';
+import { FrontendStack } from '../lib/frontend-stack';
+import { SqsStack } from '../lib/sqs-stack';
 import { StorageStack } from '../lib/storage-stack';
 import { VpcStack } from '../lib/vpc-stack';
 
@@ -30,5 +34,31 @@ const ecsStack = new EcsStack(app, 'DistributedHiveEcs', {
   eventBusName: storageStack.eventBusName,
 });
 ecsStack.addDependency(storageStack);
+
+const sqsStack = new SqsStack(app, 'DistributedHiveSqs', { env });
+
+const apiStack = new ApiStack(app, 'DistributedHiveApi', {
+  env,
+  table: storageStack.table,
+  queue: sqsStack.queue,
+  cluster: ecsStack.cluster,
+  taskDefinition: ecsStack.taskDefinition,
+  vpc: vpcStack.vpc,
+  lambdaSecurityGroup: vpcStack.lambdaSecurityGroup,
+  fargateSecurityGroup: vpcStack.fargateSecurityGroup,
+  eventBusName: storageStack.eventBusName,
+});
+apiStack.addDependency(storageStack);
+apiStack.addDependency(sqsStack);
+apiStack.addDependency(ecsStack);
+
+const eventBridgeStack = new EventBridgeStack(app, 'DistributedHiveEventBridge', {
+  env,
+  eventBusName: storageStack.eventBusName,
+  broadcasterFunction: apiStack.broadcasterFunction,
+});
+eventBridgeStack.addDependency(apiStack);
+
+const frontendStack = new FrontendStack(app, 'DistributedHiveFrontend', { env });
 
 app.synth();
