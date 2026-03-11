@@ -146,4 +146,73 @@ describe('Dashboard', () => {
     const link = screen.getByRole('link', { name: /Add OAuth login/ });
     expect(link).toHaveAttribute('href', '/run/run-active');
   });
+
+  it('treats pending status as active', () => {
+    const pendingRun: Run = { ...activeRun, id: 'run-pending', title: 'Pending Run', status: 'pending' };
+    useRunStore.getState().setRuns([pendingRun]);
+    renderDashboard();
+    const activeSection = screen.getByRole('heading', { name: 'Active Runs' }).closest('section')!;
+    expect(activeSection).toHaveTextContent('Pending Run');
+    expect(screen.queryByText('No active runs.')).not.toBeInTheDocument();
+  });
+
+  it('treats failed status as completed', () => {
+    const failedRun: Run = { ...completedRun, id: 'run-failed', title: 'Failed Run', status: 'failed' };
+    useRunStore.getState().setRuns([failedRun]);
+    renderDashboard();
+    const completedSection = screen.getByRole('heading', { name: 'Recent Completed' }).closest('section')!;
+    expect(completedSection).toHaveTextContent('Failed Run');
+  });
+
+  it('treats cancelled status as completed', () => {
+    const cancelledRun: Run = { ...completedRun, id: 'run-cancelled', title: 'Cancelled Run', status: 'cancelled' };
+    useRunStore.getState().setRuns([cancelledRun]);
+    renderDashboard();
+    const completedSection = screen.getByRole('heading', { name: 'Recent Completed' }).closest('section')!;
+    expect(completedSection).toHaveTextContent('Cancelled Run');
+  });
+
+  it('omits started time when active run has no startedAt', () => {
+    const noStartRun: Run = { ...activeRun, startedAt: undefined };
+    useRunStore.getState().setRuns([noStartRun]);
+    renderDashboard();
+    expect(screen.queryByText(/Started/)).not.toBeInTheDocument();
+  });
+
+  it('omits estimated cost when active run has no estimatedCost', () => {
+    const noCostRun: Run = { ...activeRun, estimatedCost: undefined };
+    useRunStore.getState().setRuns([noCostRun]);
+    renderDashboard();
+    expect(screen.queryByText(/est\./)).not.toBeInTheDocument();
+  });
+
+  it('omits duration when completed run lacks startedAt or completedAt', () => {
+    const noDurationRun: Run = { ...completedRun, startedAt: undefined };
+    useRunStore.getState().setRuns([noDurationRun]);
+    renderDashboard();
+    expect(screen.queryByText(/Duration:/)).not.toBeInTheDocument();
+  });
+
+  it('omits cost when completed run has no actualCost', () => {
+    const noCostRun: Run = { ...completedRun, actualCost: undefined };
+    useRunStore.getState().setRuns([noCostRun]);
+    renderDashboard();
+    expect(screen.queryByText(/Cost:/)).not.toBeInTheDocument();
+  });
+
+  it('multiple active runs all appear in active section', () => {
+    const run2: Run = { ...activeRun, id: 'run-active-2', title: 'Second Active Run' };
+    useRunStore.getState().setRuns([activeRun, run2]);
+    renderDashboard();
+    const activeSection = screen.getByRole('heading', { name: 'Active Runs' }).closest('section')!;
+    expect(activeSection).toHaveTextContent('Add OAuth login');
+    expect(activeSection).toHaveTextContent('Second Active Run');
+  });
+
+  it('completed run card links to /run/:id', () => {
+    useRunStore.getState().setRuns([completedRun]);
+    renderDashboard();
+    const link = screen.getByRole('link', { name: /Fix pagination bug/ });
+    expect(link).toHaveAttribute('href', '/run/run-done');
+  });
 });
