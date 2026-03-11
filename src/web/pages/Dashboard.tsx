@@ -2,6 +2,26 @@ import { Link } from "react-router-dom";
 import { useRunStore } from "../stores/runStore";
 import type { Run } from "../types";
 
+function formatTimeAgo(isoString: string): string {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.floor(diffHr / 24)}d ago`;
+}
+
+function formatDuration(startIso: string, endIso: string): string {
+  const diffMin = Math.floor(
+    (new Date(endIso).getTime() - new Date(startIso).getTime()) / 60_000,
+  );
+  if (diffMin < 60) return `${diffMin} min`;
+  const hr = Math.floor(diffMin / 60);
+  const min = diffMin % 60;
+  return min > 0 ? `${hr}h ${min}min` : `${hr}h`;
+}
+
 function RunCard({ run }: { run: Run }) {
   const isActive = run.status === "running" || run.status === "pending";
   const storiesDone = run.stories.filter(
@@ -30,11 +50,20 @@ function RunCard({ run }: { run: Run }) {
       <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
         <span>{run.repositories.length} repos</span>
         {isActive && <span>{agentsActive} agents active</span>}
-        {run.estimatedCost != null && (
-          <span>~${run.estimatedCost.toFixed(2)}</span>
+        {isActive && run.startedAt && (
+          <span>Started {formatTimeAgo(run.startedAt)}</span>
+        )}
+        {isActive && run.estimatedCost != null && (
+          <span>~${run.estimatedCost.toFixed(2)} est.</span>
+        )}
+        {!isActive && run.startedAt && run.completedAt && (
+          <span>Duration: {formatDuration(run.startedAt, run.completedAt)}</span>
+        )}
+        {!isActive && run.actualCost != null && (
+          <span>Cost: ${run.actualCost.toFixed(2)}</span>
         )}
         {!isActive && run.completedAt && (
-          <span>Completed {new Date(run.completedAt).toLocaleDateString()}</span>
+          <span>Completed {formatTimeAgo(run.completedAt)}</span>
         )}
       </div>
     </Link>
@@ -47,7 +76,10 @@ export function Dashboard() {
     (r) => r.status === "running" || r.status === "pending",
   );
   const completedRuns = runs.filter(
-    (r) => r.status === "completed" || r.status === "failed" || r.status === "cancelled",
+    (r) =>
+      r.status === "completed" ||
+      r.status === "failed" ||
+      r.status === "cancelled",
   );
 
   return (
