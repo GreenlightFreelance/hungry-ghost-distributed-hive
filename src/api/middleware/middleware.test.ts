@@ -3,6 +3,7 @@
 import type { APIGatewayProxyEvent } from 'aws-lambda';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withAuth } from './auth.js';
+import { withRateLimit } from './rate-limit.js';
 import { withValidation } from './validation.js';
 
 function makeEvent(overrides: Partial<APIGatewayProxyEvent> = {}): APIGatewayProxyEvent {
@@ -188,5 +189,91 @@ describe('withValidation middleware', () => {
     expect(r2.statusCode).toBe(200);
 
     delete process.env.API_KEY;
+  });
+});
+
+describe('withRateLimit middleware', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('passes through requests under the limit', async () => {
+    const handler = withRateLimit(successHandler, { windowMs: 60_000, maxRequests: 5 });
+    const event = makeEvent({
+      httpMethod: 'POST',
+      resource: '/api/runs',
+      requestContext: {
+        identity: { sourceIp: '1.2.3.4' },
+      } as APIGatewayProxyEvent['requestContext'],
+    });
+
+    const result = await handler(event);
+    expect(result.statusCode).toBe(200);
+    expect(successHandler).toHaveBeenCalledOnce();
+  });
+
+  it('returns 429 when rate limit exceeded', async () => {
+    const handler = withRateLimit(successHandler, { windowMs: 60_000, maxRequests: 2 });
+    const event = makeEvent({
+      httpMethod: 'POST',
+      resource: '/api/runs',
+      requestContext: {
+        identity: { sourceIp: '10.0.0.1' },
+      } as APIGatewayProxyEvent['requestContext'],
+    });
+
+    await handler(event);
+    await handler(event);
+    const result = await handler(event);
+
+    expect(result.statusCode).toBe(429);
+    const body = JSON.parse(result.body);
+    expect(body.error).toBe('Too many requests');
+    expect(body.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it('includes rate limit headers on 429', async () => {
+    const handler = withRateLimit(successHandler, { windowMs: 60_000, maxRequests: 1 });
+    const event = makeEvent({
+      httpMethod: 'GET',
+      resource: '/api/runs',
+      requestContext: {
+        identity: { sourceIp: '10.0.0.2' },
+      } as APIGatewayProxyEvent['requestContext'],
+    });
+
+    await handler(event);
+    const result = await handler(event);
+
+    expect(result.statusCode).toBe(429);
+    expect(result.headers?.['Retry-After']).toBeDefined();
+    expect(result.headers?.['X-RateLimit-Limit']).toBe('1');
+    expect(result.headers?.['X-RateLimit-Remaining']).toBe('0');
+  });
+
+  it('tracks different clients independently', async () => {
+    const handler = withRateLimit(successHandler, { windowMs: 60_000, maxRequests: 1 });
+
+    const event1 = makeEvent({
+      httpMethod: 'GET',
+      resource: '/api/runs',
+      requestContext: {
+        identity: { sourceIp: '10.0.0.3' },
+      } as APIGatewayProxyEvent['requestContext'],
+    });
+    const event2 = makeEvent({
+      httpMethod: 'GET',
+      resource: '/api/runs',
+      requestContext: {
+        identity: { sourceIp: '10.0.0.4' },
+      } as APIGatewayProxyEvent['requestContext'],
+    });
+
+    await handler(event1);
+    const r1 = await handler(event1);
+    const r2 = await handler(event2);
+
+    expect(r1.statusCode).toBe(429);
+    expect(r2.statusCode).toBe(200);
   });
 });

@@ -64,7 +64,7 @@ export class VpcStack extends cdk.Stack {
       'Allow NFS from Fargate tasks'
     );
 
-    // sg-lambda: Outbound 443 (DynamoDB, API Gateway)
+    // sg-lambda: Outbound 443 (DynamoDB, API Gateway) and 2049 (EFS)
     this.lambdaSecurityGroup = new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
       vpc: this.vpc,
       securityGroupName: 'sg-lambda',
@@ -76,6 +76,19 @@ export class VpcStack extends cdk.Stack {
       ec2.Peer.anyIpv4(),
       ec2.Port.tcp(443),
       'Allow HTTPS outbound for DynamoDB and API Gateway'
+    );
+
+    this.lambdaSecurityGroup.addEgressRule(
+      this.efsSecurityGroup,
+      ec2.Port.tcp(2049),
+      'Allow NFS outbound to EFS'
+    );
+
+    // Allow NFS from Lambda to EFS (must be after lambdaSecurityGroup creation)
+    this.efsSecurityGroup.addIngressRule(
+      this.lambdaSecurityGroup,
+      ec2.Port.tcp(2049),
+      'Allow NFS from Lambda functions (EFS cleanup)'
     );
 
     // Outputs
