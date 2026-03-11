@@ -1,7 +1,7 @@
 // Licensed under the Hungry Ghost Hive License. See LICENSE.
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { APIGatewayProxyEvent } from 'aws-lambda';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handler, setFetchFn } from './authGithub.js';
 
 function makeEvent(body: unknown): APIGatewayProxyEvent {
@@ -64,7 +64,11 @@ describe('authGithub handler', () => {
   it('returns 401 when GitHub returns error in token response', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ error: 'bad_verification_code', error_description: 'The code is invalid' }),
+      json: () =>
+        Promise.resolve({
+          error: 'bad_verification_code',
+          error_description: 'The code is invalid',
+        }),
     });
     setFetchFn(mockFetch as unknown as typeof fetch);
 
@@ -74,14 +78,20 @@ describe('authGithub handler', () => {
   });
 
   it('exchanges code and returns user data on success', async () => {
-    const mockFetch = vi.fn()
+    const mockFetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ access_token: 'gho_abc123', token_type: 'bearer' }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ login: 'testuser', avatar_url: 'https://avatar.url', name: 'Test User' }),
+        json: () =>
+          Promise.resolve({
+            login: 'testuser',
+            avatar_url: 'https://avatar.url',
+            name: 'Test User',
+          }),
       });
     setFetchFn(mockFetch as unknown as typeof fetch);
 
@@ -103,7 +113,8 @@ describe('authGithub handler', () => {
   });
 
   it('returns 502 when user profile fetch fails', async () => {
-    const mockFetch = vi.fn()
+    const mockFetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ access_token: 'gho_abc123' }),

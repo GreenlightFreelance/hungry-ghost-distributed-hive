@@ -42,11 +42,7 @@ export function AppLayout() {
           </nav>
           {user && (
             <div className="flex items-center gap-3 ml-4 pl-4 border-l border-gray-200">
-              <img
-                src={user.avatarUrl}
-                alt={user.login}
-                className="w-7 h-7 rounded-full"
-              />
+              <img src={user.avatarUrl} alt={user.login} className="w-7 h-7 rounded-full" />
               <span className="text-sm text-gray-700 font-medium">{user.login}</span>
               <button
                 onClick={handleLogout}

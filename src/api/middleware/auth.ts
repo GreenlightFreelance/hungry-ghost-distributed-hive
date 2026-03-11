@@ -33,8 +33,7 @@ export function withAuth(handler: LambdaHandler): LambdaHandler {
     }
 
     // Method 2: GitHub OAuth Bearer token
-    const authHeader =
-      event.headers?.['authorization'] || event.headers?.['Authorization'];
+    const authHeader = event.headers?.['authorization'] || event.headers?.['Authorization'];
 
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);

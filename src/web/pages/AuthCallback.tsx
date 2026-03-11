@@ -56,10 +56,7 @@ export function AuthCallback() {
         <div className="max-w-sm w-full bg-white rounded-lg border border-gray-200 p-8 text-center">
           <h1 className="text-lg font-semibold text-red-600 mb-2">Authentication Failed</h1>
           <p className="text-gray-600 text-sm mb-4">{error}</p>
-          <a
-            href="/login"
-            className="text-sm text-hive-600 hover:text-hive-800 font-medium"
-          >
+          <a href="/login" className="text-sm text-hive-600 hover:text-hive-800 font-medium">
             Try again
           </a>
         </div>

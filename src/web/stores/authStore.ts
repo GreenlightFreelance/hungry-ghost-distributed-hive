@@ -47,7 +47,7 @@ export const storage = {
   },
 };
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>(set => ({
   token: null,
   user: null,
   isAuthenticated: false,
