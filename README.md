@@ -789,11 +789,11 @@ make local-down
 
 ### Services
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| LocalStack | http://localhost:4566 | DynamoDB, SQS, EventBridge, S3, Secrets Manager |
-| Dashboard | http://localhost:3000 | Web dashboard UI |
-| Hive | (internal) | Hive orchestrator running with `LOCAL_MODE=true` |
+| Service    | URL                   | Description                                      |
+| ---------- | --------------------- | ------------------------------------------------ |
+| LocalStack | http://localhost:4566 | DynamoDB, SQS, EventBridge, S3, Secrets Manager  |
+| Dashboard  | http://localhost:3000 | Web dashboard UI                                 |
+| Hive       | (internal)            | Hive orchestrator running with `LOCAL_MODE=true` |
 
 ### Using Real API Keys
 
@@ -805,18 +805,19 @@ ANTHROPIC_API_KEY=sk-ant-... GITHUB_TOKEN=ghp_... make local-up
 
 ### Makefile Targets
 
-| Target | Description |
-|--------|-------------|
-| `make local-up` | Build and start all services |
-| `make local-down` | Stop services and remove volumes |
-| `make local-test` | Submit a test requirement, verify LocalStack integration |
-| `make local-logs` | Follow logs from all containers |
-| `make local-restart` | Stop and restart all services |
-| `make local-status` | Show container status |
+| Target               | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `make local-up`      | Build and start all services                             |
+| `make local-down`    | Stop services and remove volumes                         |
+| `make local-test`    | Submit a test requirement, verify LocalStack integration |
+| `make local-logs`    | Follow logs from all containers                          |
+| `make local-restart` | Stop and restart all services                            |
+| `make local-status`  | Show container status                                    |
 
 ### How LOCAL_MODE Works
 
 When `LOCAL_MODE=true`:
+
 - The entrypoint skips AWS Secrets Manager calls and uses API keys from environment variables directly
 - All AWS SDK clients point to LocalStack (`LOCALSTACK_ENDPOINT` env var) instead of real AWS
 - The state sync adapter writes to LocalStack DynamoDB and EventBridge
