@@ -43,8 +43,22 @@ const testRun: Run = {
 };
 
 const testStories: Story[] = [
-  { id: 'STR-001', title: 'Create OAuth flow', points: 3, status: 'done', assignee: 'junior-1', prNumber: 142, prUrl: 'https://github.com/org/repo/pull/142' },
-  { id: 'STR-002', title: 'Add token refresh', points: 5, status: 'in_progress', assignee: 'senior-1' },
+  {
+    id: 'STR-001',
+    title: 'Create OAuth flow',
+    points: 3,
+    status: 'done',
+    assignee: 'junior-1',
+    prNumber: 142,
+    prUrl: 'https://github.com/org/repo/pull/142',
+  },
+  {
+    id: 'STR-002',
+    title: 'Add token refresh',
+    points: 5,
+    status: 'in_progress',
+    assignee: 'senior-1',
+  },
   { id: 'STR-003', title: 'Add logout button', points: 2, status: 'todo' },
 ];
 
@@ -56,13 +70,37 @@ const testAgents: Agent[] = [
 ];
 
 const testLogs: LogEntry[] = [
-  { id: 'log-1', timestamp: new Date(Date.now() - 10 * 60_000).toISOString(), message: 'Run started', source: 'system', level: 'info' },
-  { id: 'log-2', timestamp: new Date(Date.now() - 5 * 60_000).toISOString(), message: 'Senior started STR-002', source: 'senior-1', level: 'info' },
-  { id: 'log-3', timestamp: new Date(Date.now() - 2 * 60_000).toISOString(), message: 'Build failed for STR-003', source: 'junior-1', level: 'error' },
+  {
+    id: 'log-1',
+    timestamp: new Date(Date.now() - 10 * 60_000).toISOString(),
+    message: 'Run started',
+    source: 'system',
+    level: 'info',
+  },
+  {
+    id: 'log-2',
+    timestamp: new Date(Date.now() - 5 * 60_000).toISOString(),
+    message: 'Senior started STR-002',
+    source: 'senior-1',
+    level: 'info',
+  },
+  {
+    id: 'log-3',
+    timestamp: new Date(Date.now() - 2 * 60_000).toISOString(),
+    message: 'Build failed for STR-003',
+    source: 'junior-1',
+    level: 'error',
+  },
 ];
 
 const testEscalations: Escalation[] = [
-  { id: 'esc-1', storyId: 'STR-004', message: 'Ambiguous requirement - which OAuth provider?', timestamp: new Date().toISOString(), resolved: false },
+  {
+    id: 'esc-1',
+    storyId: 'STR-004',
+    message: 'Ambiguous requirement - which OAuth provider?',
+    timestamp: new Date().toISOString(),
+    resolved: false,
+  },
 ];
 
 function renderRunView(runId = 'run-1') {
@@ -347,7 +385,13 @@ describe('RunView', () => {
     it('hides resolved escalations', () => {
       seedStore();
       useRunStore.getState().setEscalations([
-        { id: 'esc-1', storyId: 'STR-004', message: 'Ambiguous requirement - which OAuth provider?', timestamp: new Date().toISOString(), resolved: true },
+        {
+          id: 'esc-1',
+          storyId: 'STR-004',
+          message: 'Ambiguous requirement - which OAuth provider?',
+          timestamp: new Date().toISOString(),
+          resolved: true,
+        },
       ]);
       renderRunView();
       expect(screen.queryByText(/Ambiguous requirement/)).not.toBeInTheDocument();
@@ -361,9 +405,7 @@ describe('RunView', () => {
 
       // The Cancel button in the reply form
       const cancelButtons = screen.getAllByText('Cancel');
-      const replyCancelBtn = cancelButtons.find(
-        btn => btn.classList.contains('text-xs')
-      );
+      const replyCancelBtn = cancelButtons.find(btn => btn.classList.contains('text-xs'));
       fireEvent.click(replyCancelBtn!);
       expect(screen.queryByPlaceholderText('Type your reply…')).not.toBeInTheDocument();
     });
