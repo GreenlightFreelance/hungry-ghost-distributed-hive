@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { useAuthStore } from '../stores/authStore';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.distributed-hive.com';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
@@ -28,6 +29,7 @@ interface RequestOptions {
 export function useApi(options: UseApiOptions = {}) {
   const baseUrl = options.baseUrl || API_BASE;
   const apiKey = options.apiKey || API_KEY;
+  const token = useAuthStore(state => state.token);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -44,7 +46,8 @@ export function useApi(options: UseApiOptions = {}) {
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...(apiKey ? { 'x-api-key': apiKey } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(apiKey && !token ? { 'x-api-key': apiKey } : {}),
         ...opts.headers,
       };
 
@@ -78,7 +81,7 @@ export function useApi(options: UseApiOptions = {}) {
         throw apiErr;
       }
     },
-    [baseUrl, apiKey]
+    [baseUrl, apiKey, token]
   );
 
   const get = useCallback(<T>(path: string) => request<T>(path), [request]);

@@ -1,5 +1,6 @@
 // Licensed under the Hungry Ghost Hive License. See LICENSE.
 
+export { handler as authGithub } from './authGithub.js';
 export { handler as cancelRun } from './cancelRun.js';
 export { handler as createRun } from './createRun.js';
 export { handler as getAgents } from './getAgents.js';

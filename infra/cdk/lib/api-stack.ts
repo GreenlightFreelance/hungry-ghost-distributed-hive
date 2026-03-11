@@ -28,6 +28,7 @@ interface RouteConfig {
 }
 
 const REST_ROUTES: RouteConfig[] = [
+  { method: apigatewayv2.HttpMethod.POST, path: '/api/auth/github', handler: 'authGithub' },
   { method: apigatewayv2.HttpMethod.POST, path: '/api/runs', handler: 'createRun' },
   { method: apigatewayv2.HttpMethod.GET, path: '/api/runs', handler: 'listRuns' },
   { method: apigatewayv2.HttpMethod.GET, path: '/api/runs/{id}', handler: 'getRun' },
