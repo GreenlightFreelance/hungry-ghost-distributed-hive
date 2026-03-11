@@ -13,7 +13,6 @@ function renderDashboard() {
   );
 }
 
-const now = new Date().toISOString();
 const oneHourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
 const twoHoursAgo = new Date(Date.now() - 120 * 60_000).toISOString();
 
