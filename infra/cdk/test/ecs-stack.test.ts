@@ -206,6 +206,35 @@ describe('EcsStack', () => {
     });
   });
 
+  describe('Fargate Spot Capacity Providers', () => {
+    it('enables Fargate capacity providers on cluster', () => {
+      template.hasResourceProperties('AWS::ECS::ClusterCapacityProviderAssociations', {
+        CapacityProviders: Match.arrayWith(['FARGATE', 'FARGATE_SPOT']),
+      });
+    });
+
+    it('configures default capacity provider strategy with Spot preferred', () => {
+      template.hasResourceProperties('AWS::ECS::ClusterCapacityProviderAssociations', {
+        DefaultCapacityProviderStrategy: Match.arrayWith([
+          Match.objectLike({ CapacityProvider: 'FARGATE_SPOT', Weight: 3 }),
+          Match.objectLike({ CapacityProvider: 'FARGATE', Weight: 1, Base: 1 }),
+        ]),
+      });
+    });
+  });
+
+  describe('Container Stop Timeout', () => {
+    it('configures 120s stop timeout for graceful shutdown', () => {
+      template.hasResourceProperties('AWS::ECS::TaskDefinition', {
+        ContainerDefinitions: [
+          Match.objectLike({
+            StopTimeout: 120,
+          }),
+        ],
+      });
+    });
+  });
+
   describe('Outputs', () => {
     it('exports cluster and task definition info', () => {
       template.hasOutput('ClusterName', {});

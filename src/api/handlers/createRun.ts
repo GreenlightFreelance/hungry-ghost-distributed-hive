@@ -80,12 +80,15 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     })
   );
 
-  // Launch Fargate task
+  // Launch Fargate task with Spot capacity (fallback to on-demand)
   const taskResult = await getECS().send(
     new RunTaskCommand({
       cluster: CLUSTER_ARN,
       taskDefinition: TASK_DEFINITION,
-      launchType: 'FARGATE',
+      capacityProviderStrategy: [
+        { capacityProvider: 'FARGATE_SPOT', weight: 3, base: 0 },
+        { capacityProvider: 'FARGATE', weight: 1, base: 1 },
+      ],
       count: 1,
       networkConfiguration: {
         awsvpcConfiguration: {
