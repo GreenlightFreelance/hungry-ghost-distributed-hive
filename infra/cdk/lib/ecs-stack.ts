@@ -37,12 +37,17 @@ export class EcsStack extends cdk.Stack {
   public readonly cluster: ecs.Cluster;
   public readonly taskDefinition: ecs.FargateTaskDefinition;
   public readonly repository: ecr.Repository;
+  public readonly clusterArn: string;
 
   constructor(scope: Construct, id: string, props: EcsStackProps) {
     super(scope, id, props);
 
     const tier = props.sizingTier ?? 'medium';
     const sizing = SIZING_TIERS[tier];
+    this.clusterArn = cdk.Arn.format(
+      { service: 'ecs', resource: 'cluster', resourceName: 'distributed-hive' },
+      this
+    );
 
     // ECR repository
     this.repository = new ecr.Repository(this, 'Repository', {
@@ -63,14 +68,37 @@ export class EcsStack extends cdk.Stack {
       containerInsights: true,
     });
 
-    // Execution role
+    // Execution role — least-privilege inline policy (no managed policy)
     const executionRole = new iam.Role(this, 'ExecutionRole', {
       roleName: 'hive-execution-role',
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
-      ],
     });
+
+    executionRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'ecr:GetAuthorizationToken',
+          'ecr:BatchGetImage',
+          'ecr:GetDownloadUrlForLayer',
+          'ecr:BatchCheckLayerAvailability',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+        ],
+        resources: ['*'],
+      })
+    );
+
+    executionRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: [
+          cdk.Arn.format(
+            { service: 'secretsmanager', resource: 'secret', resourceName: 'hive/*' },
+            this
+          ),
+        ],
+      })
+    );
 
     // Task role
     const taskRole = new iam.Role(this, 'TaskRole', {
@@ -78,23 +106,43 @@ export class EcsStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
 
-    // Grant DynamoDB access to task role
-    props.table.grantReadWriteData(taskRole);
+    // DynamoDB: scoped to distributed-hive-* tables
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'dynamodb:PutItem',
+          'dynamodb:UpdateItem',
+          'dynamodb:GetItem',
+          'dynamodb:Query',
+          'dynamodb:DeleteItem',
+        ],
+        resources: [
+          cdk.Arn.format(
+            { service: 'dynamodb', resource: 'table', resourceName: 'distributed-hive-*' },
+            this
+          ),
+        ],
+      })
+    );
 
-    // Grant EventBridge access to task role
+    // EventBridge: scoped to distributed-hive-* event buses
     taskRole.addToPolicy(
       new iam.PolicyStatement({
         actions: ['events:PutEvents'],
         resources: [
           cdk.Arn.format(
-            {
-              service: 'events',
-              resource: 'event-bus',
-              resourceName: props.eventBusName,
-            },
+            { service: 'events', resource: 'event-bus', resourceName: 'distributed-hive-*' },
             this
           ),
         ],
+      })
+    );
+
+    // S3: scoped to distributed-hive-* buckets
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:PutObject', 's3:GetObject'],
+        resources: ['arn:aws:s3:::distributed-hive-*'],
       })
     );
 
@@ -109,10 +157,6 @@ export class EcsStack extends cdk.Stack {
       'GithubToken',
       'hive/github-token'
     );
-
-    // Grant secrets read to execution role
-    anthropicKeySecret.grantRead(executionRole);
-    githubTokenSecret.grantRead(executionRole);
 
     // Task definition
     this.taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDefinition', {

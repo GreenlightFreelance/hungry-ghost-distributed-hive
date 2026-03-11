@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { EcsStack } from '../lib/ecs-stack';
+import { IamStack } from '../lib/iam-stack';
 import { StorageStack } from '../lib/storage-stack';
 import { VpcStack } from '../lib/vpc-stack';
 
@@ -30,5 +31,14 @@ const ecsStack = new EcsStack(app, 'DistributedHiveEcs', {
   eventBusName: storageStack.eventBusName,
 });
 ecsStack.addDependency(storageStack);
+
+const iamStack = new IamStack(app, 'DistributedHiveIam', {
+  env,
+  tableName: storageStack.table.tableName,
+  eventBusName: storageStack.eventBusName,
+  clusterArn: ecsStack.clusterArn,
+  taskDefinitionArn: ecsStack.taskDefinition.taskDefinitionArn,
+});
+iamStack.addDependency(ecsStack);
 
 app.synth();
