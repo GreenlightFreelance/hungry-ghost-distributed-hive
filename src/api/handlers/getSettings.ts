@@ -1,7 +1,11 @@
 // Licensed under the Hungry Ghost Hive License. See LICENSE.
 
 import { getSettings } from '../shared/dynamo.js';
-import { type APIGatewayProxyEvent, type APIGatewayProxyResult, response } from '../shared/types.js';
+import {
+  type APIGatewayProxyEvent,
+  type APIGatewayProxyResult,
+  response,
+} from '../shared/types.js';
 
 export async function handler(_event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   const settings = await getSettings();

@@ -119,7 +119,9 @@ describe('createRun handler', () => {
 });
 
 describe('listRuns handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns empty list when no runs', async () => {
     vi.mocked(listAllRuns).mockResolvedValue([]);
@@ -156,7 +158,9 @@ describe('listRuns handler', () => {
 });
 
 describe('getRun handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns 400 when id is missing', async () => {
     const result = await getRunHandler(makeEvent());
@@ -257,12 +261,17 @@ describe('cancelRun handler', () => {
     expect(result.statusCode).toBe(200);
     expect(JSON.parse(result.body).status).toBe('cancelled');
     expect(mockECSSend).toHaveBeenCalled();
-    expect(putRunMeta).toHaveBeenCalledWith('run-1', expect.objectContaining({ status: 'cancelled' }));
+    expect(putRunMeta).toHaveBeenCalledWith(
+      'run-1',
+      expect.objectContaining({ status: 'cancelled' })
+    );
   });
 });
 
 describe('getStories handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns 400 when id is missing', async () => {
     const result = await getStories(makeEvent());
@@ -290,7 +299,9 @@ describe('getStories handler', () => {
 });
 
 describe('getAgents handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns agents for a run', async () => {
     vi.mocked(queryByRunId).mockResolvedValue([
@@ -311,7 +322,9 @@ describe('getAgents handler', () => {
 });
 
 describe('getLogs handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns logs for a run', async () => {
     vi.mocked(queryByRunId).mockResolvedValue([
@@ -332,7 +345,9 @@ describe('getLogs handler', () => {
 });
 
 describe('getPRs handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns PRs for a run', async () => {
     vi.mocked(queryByRunId).mockResolvedValue([
@@ -353,7 +368,9 @@ describe('getPRs handler', () => {
 });
 
 describe('sendMessage handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns 400 when id is missing', async () => {
     const result = await sendMessage(makeEvent());
@@ -415,7 +432,9 @@ describe('sendMessage handler', () => {
 });
 
 describe('updateSettings handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns 400 when body is missing', async () => {
     const result = await updateSettingsHandler(makeEvent());
@@ -442,7 +461,9 @@ describe('updateSettings handler', () => {
 });
 
 describe('getSettings handler', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('returns empty settings when none exist', async () => {
     vi.mocked(getSettings).mockResolvedValue(null);
