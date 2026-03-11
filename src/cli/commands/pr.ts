@@ -1,0 +1,612 @@
+// Licensed under the Hungry Ghost Hive License. See LICENSE.
+
+import chalk from 'chalk';
+import { Command } from 'commander';
+import { execa } from 'execa';
+import { join } from 'path';
+import { fetchLocalClusterStatus } from '../../cluster/runtime.js';
+import { loadConfig } from '../../config/loader.js';
+import {
+  postLifecycleComment,
+  syncStatusForStory,
+} from '../../connectors/project-management/operations.js';
+import { createLog, getLogsByEventType } from '../../db/queries/logs.js';
+import {
+  createPullRequest,
+  getMergeQueue,
+  getNextInQueue,
+  getOpenPullRequestsByStory,
+  getQueuePosition,
+  updatePullRequest,
+} from '../../db/queries/pull-requests.js';
+import { updateStory } from '../../db/queries/stories.js';
+import { getTeamById } from '../../db/queries/teams.js';
+import { Scheduler } from '../../orchestrator/scheduler.js';
+import { isTmuxSessionRunning, sendToTmuxSession } from '../../tmux/manager.js';
+import { autoMergeApprovedPRs } from '../../utils/auto-merge.js';
+import { requirePullRequest, requireStory } from '../../utils/cli-helpers.js';
+import { markManualMergeRequired } from '../../utils/manual-merge.js';
+import { getExistingPRIdentifiers, syncOpenGitHubPRs } from '../../utils/pr-sync.js';
+import { extractStoryIdFromBranch, normalizeStoryId } from '../../utils/story-id.js';
+import { withHiveContext, withReadOnlyHiveContext } from '../../utils/with-hive-context.js';
+
+export const prCommand = new Command('pr').description('Manage pull requests and merge queue');
+
+// Submit a PR to the merge queue
+prCommand
+  .command('submit')
+  .description('Submit a PR to the merge queue')
+  .requiredOption('-b, --branch <branch>', 'Branch name')
+  .requiredOption('-s, --story <story-id>', 'Associated story ID')
+  .option('-t, --team <team-id>', 'Team ID')
+  .option('--pr-number <number>', 'GitHub PR number')
+  .option('--pr-url <url>', 'GitHub PR URL')
+  .option('--from <session>', 'Submitting agent session')
+  .action(
+    async (options: {
+      branch: string;
+      story: string;
+      team?: string;
+      prNumber?: string;
+      prUrl?: string;
+      from?: string;
+    }) => {
+      await withHiveContext(async ({ root, paths, db }) => {
+        // Story ID is now required - normalize it
+        const storyId = normalizeStoryId(options.story);
+
+        // Get team from story
+        let teamId = options.team || null;
+        const story = requireStory(db.db, storyId);
+
+        teamId = story.team_id;
+
+        // Auto-close any existing open PRs for this story
+        const incomingPrNumber = options.prNumber ? parseInt(options.prNumber, 10) : null;
+        const existingPRs = getOpenPullRequestsByStory(db.db, storyId);
+        for (const existingPR of existingPRs) {
+          // Skip auto-close if this is a resubmit of the same GitHub PR
+          if (incomingPrNumber !== null && existingPR.github_pr_number === incomingPrNumber) {
+            continue;
+          }
+          updatePullRequest(db.db, existingPR.id, { status: 'closed' });
+          createLog(db.db, {
+            agentId: options.from || 'system',
+            storyId,
+            eventType: 'PR_CLOSED',
+            message: `Auto-closed duplicate PR ${existingPR.id}`,
+            metadata: { pr_id: existingPR.id, reason: 'duplicate' },
+          });
+
+          // Close the PR on GitHub if it has a PR number
+          if (existingPR.github_pr_number) {
+            try {
+              // Determine repo directory for gh CLI
+              let repoCwd = root;
+              if (teamId) {
+                const team = getTeamById(db.db, teamId);
+                if (team?.repo_path) {
+                  repoCwd = join(root, team.repo_path);
+                }
+              }
+              await execa('gh', ['pr', 'close', String(existingPR.github_pr_number)], {
+                cwd: repoCwd,
+              });
+              console.log(
+                chalk.gray(
+                  `  Closed stale GitHub PR #${existingPR.github_pr_number} for ${storyId}`
+                )
+              );
+            } catch (error) {
+              // Non-fatal - PR might already be closed or gh CLI not authenticated
+              console.log(
+                chalk.yellow(
+                  `  Warning: Could not close GitHub PR #${existingPR.github_pr_number}: ${error instanceof Error ? error.message : String(error)}`
+                )
+              );
+            }
+          }
+        }
+
+        // Update story status
+        updateStory(db.db, storyId, { status: 'pr_submitted' });
+
+        // Sync status change to Jira
+        await syncStatusForStory(root, db.db, storyId, 'pr_submitted');
+
+        const pr = createPullRequest(db.db, {
+          storyId,
+          teamId,
+          branchName: options.branch,
+          githubPrNumber: options.prNumber ? parseInt(options.prNumber, 10) : null,
+          githubPrUrl: options.prUrl || null,
+          submittedBy: options.from || null,
+        });
+
+        db.save();
+
+        const position = getQueuePosition(db.db, pr.id);
+
+        console.log(chalk.green(`PR submitted to merge queue`));
+        console.log(chalk.gray(`  ID: ${pr.id}`));
+        console.log(chalk.gray(`  Branch: ${pr.branch_name}`));
+        console.log(chalk.gray(`  Queue position: ${position}`));
+        if (pr.github_pr_url) {
+          console.log(chalk.gray(`  GitHub: ${pr.github_pr_url}`));
+        }
+
+        if (options.from) {
+          createLog(db.db, {
+            agentId: options.from,
+            storyId: storyId || undefined,
+            eventType: 'PR_SUBMITTED',
+            message: `Submitted PR for branch ${options.branch}`,
+            metadata: { pr_id: pr.id, queue_position: position },
+          });
+          db.save();
+        }
+
+        // Post Jira comment for PR created event
+        try {
+          const config = loadConfig(paths.hiveDir);
+          await postLifecycleComment(db.db, paths.hiveDir, config, storyId, 'pr_created', {
+            agentName: options.from,
+            prUrl: pr.github_pr_url || undefined,
+          });
+        } catch {
+          // Non-fatal - just log
+        }
+
+        // Check if QA agents need to be spawned for the merge queue
+        try {
+          const config = loadConfig(paths.hiveDir);
+          const clusterStatus = config.cluster.enabled
+            ? await fetchLocalClusterStatus(config.cluster)
+            : null;
+
+          if (!config.cluster.enabled || clusterStatus?.is_leader) {
+            const scheduler = new Scheduler(db.db, {
+              scaling: config.scaling,
+              models: config.models,
+              qa: config.qa,
+              rootDir: root,
+              saveFn: () => db.save(),
+              hiveConfig: config,
+            });
+            await scheduler.checkMergeQueue();
+            db.save();
+            console.log(chalk.gray('  QA agents notified'));
+          }
+        } catch {
+          // Non-fatal - QA can be triggered manually
+        }
+      });
+    }
+  );
+
+// View merge queue
+prCommand
+  .command('queue')
+  .description('View the merge queue')
+  .option('-t, --team <team-id>', 'Filter by team')
+  .option('--json', 'Output as JSON')
+  .action(async (options: { team?: string; json?: boolean }) => {
+    await withReadOnlyHiveContext(async ({ db }) => {
+      const queue = getMergeQueue(db.db, options.team);
+
+      if (options.json) {
+        console.log(JSON.stringify(queue, null, 2));
+        return;
+      }
+
+      if (queue.length === 0) {
+        console.log(chalk.yellow('Merge queue is empty.'));
+        return;
+      }
+
+      console.log(chalk.bold('\nMerge Queue:\n'));
+      console.log(
+        chalk.gray(
+          `${'#'.padEnd(4)} ${'ID'.padEnd(15)} ${'Branch'.padEnd(30)} ${'Status'.padEnd(12)} ${'Story'}`
+        )
+      );
+      console.log(chalk.gray('─'.repeat(80)));
+
+      queue.forEach((pr, index) => {
+        const statusColor = pr.status === 'reviewing' ? chalk.yellow : chalk.blue;
+        console.log(
+          `${String(index + 1).padEnd(4)} ` +
+            `${chalk.cyan(pr.id.padEnd(15))} ` +
+            `${pr.branch_name.padEnd(30)} ` +
+            `${statusColor(pr.status.toUpperCase().padEnd(12))} ` +
+            `${pr.story_id || '-'}`
+        );
+      });
+      console.log();
+    });
+  });
+
+// Claim next PR for review (QA)
+prCommand
+  .command('review')
+  .description('Claim the next PR in queue for review (QA)')
+  .option('-t, --team <team-id>', 'Filter by team')
+  .option('--from <session>', 'QA agent session')
+  .action(async (options: { team?: string; from?: string }) => {
+    await withHiveContext(async ({ db }) => {
+      const pr = getNextInQueue(db.db, options.team);
+
+      if (!pr) {
+        console.log(chalk.yellow('No PRs waiting for review.'));
+        return;
+      }
+
+      updatePullRequest(db.db, pr.id, {
+        status: 'reviewing',
+        reviewedBy: options.from || null,
+      });
+      db.save();
+
+      console.log(chalk.green(`Claimed PR for review: ${pr.id}`));
+      console.log(chalk.gray(`  Branch: ${pr.branch_name}`));
+      console.log(chalk.gray(`  Story: ${pr.story_id || '-'}`));
+      if (pr.github_pr_url) {
+        console.log(chalk.gray(`  GitHub: ${pr.github_pr_url}`));
+      }
+      console.log();
+      console.log(chalk.cyan('To approve and merge:'));
+      console.log(chalk.gray(`  hive pr approve ${pr.id}`));
+      console.log(chalk.cyan('To reject:'));
+      console.log(chalk.gray(`  hive pr reject ${pr.id} --reason "..."`));
+
+      if (options.from) {
+        createLog(db.db, {
+          agentId: options.from,
+          storyId: pr.story_id || undefined,
+          eventType: 'PR_REVIEW_STARTED',
+          message: `Started reviewing PR ${pr.id}`,
+          metadata: { pr_id: pr.id, branch: pr.branch_name },
+        });
+        db.save();
+      }
+    });
+  });
+
+// View specific PR
+prCommand
+  .command('show <pr-id>')
+  .description('View details of a PR')
+  .action(async (prId: string) => {
+    await withReadOnlyHiveContext(async ({ db }) => {
+      const pr = requirePullRequest(db.db, prId);
+
+      console.log(chalk.bold(`\nPull Request: ${pr.id}\n`));
+      console.log(chalk.gray(`Branch:       ${pr.branch_name}`));
+      console.log(chalk.gray(`Status:       ${pr.status.toUpperCase()}`));
+      console.log(chalk.gray(`Story:        ${pr.story_id || '-'}`));
+      console.log(chalk.gray(`Team:         ${pr.team_id || '-'}`));
+      console.log(chalk.gray(`GitHub PR:    ${pr.github_pr_url || '-'}`));
+      console.log(chalk.gray(`Submitted by: ${pr.submitted_by || '-'}`));
+      console.log(chalk.gray(`Reviewed by:  ${pr.reviewed_by || '-'}`));
+      console.log(chalk.gray(`Created:      ${pr.created_at}`));
+      if (pr.reviewed_at) {
+        console.log(chalk.gray(`Reviewed:     ${pr.reviewed_at}`));
+      }
+      if (pr.review_notes) {
+        console.log(chalk.bold('\nReview Notes:'));
+        console.log(pr.review_notes);
+      }
+
+      const position = getQueuePosition(db.db, pr.id);
+      if (position > 0) {
+        console.log(chalk.cyan(`\nQueue Position: ${position}`));
+      }
+      console.log();
+    });
+  });
+
+// Approve and merge PR
+prCommand
+  .command('approve <pr-id>')
+  .description('Approve and merge a PR')
+  .option('--notes <notes>', 'Review notes')
+  .option('--from <session>', 'QA agent session')
+  .option('--no-merge', 'Approve without merging (manual merge needed)')
+  .action(async (prId: string, options: { notes?: string; from?: string; merge?: boolean }) => {
+    await withHiveContext(async ({ root, db }) => {
+      const pr = requirePullRequest(db.db, prId);
+
+      if (pr.status === 'merged') {
+        console.log(chalk.yellow('PR already merged.'));
+        return;
+      }
+
+      // Extract story ID from PR or branch name using unified pattern
+      let storyId = pr.story_id;
+      if (!storyId && pr.branch_name) {
+        storyId = extractStoryIdFromBranch(pr.branch_name);
+      }
+
+      const shouldMerge = options.merge !== false;
+      let actuallyMerged = false;
+
+      if (shouldMerge && pr.github_pr_number) {
+        // Actually merge on GitHub via gh CLI
+        // Use the team's repo path as cwd so gh knows which repo to operate on
+        let repoCwd = root;
+        if (pr.team_id) {
+          const team = getTeamById(db.db, pr.team_id);
+          if (team?.repo_path) {
+            repoCwd = join(root, team.repo_path);
+          }
+        }
+        try {
+          const { execSync } = await import('child_process');
+          // First approve the PR on GitHub
+          try {
+            execSync(`gh pr review ${pr.github_pr_number} --approve`, {
+              stdio: 'pipe',
+              cwd: repoCwd,
+            });
+          } catch (_error) {
+            // May fail if already approved or if it's our own PR - continue
+          }
+          // Then merge
+          execSync(`gh pr merge ${pr.github_pr_number} --squash --delete-branch`, {
+            stdio: 'pipe',
+            cwd: repoCwd,
+          });
+          actuallyMerged = true;
+          console.log(chalk.green(`PR ${prId} approved and merged on GitHub!`));
+        } catch (mergeErr: unknown) {
+          const errMsg = mergeErr instanceof Error ? mergeErr.message : String(mergeErr);
+          if (/already merged/i.test(errMsg)) {
+            actuallyMerged = true;
+            console.log(chalk.green(`PR ${prId} was already merged on GitHub.`));
+          } else {
+            console.log(chalk.yellow(`GitHub merge failed: ${errMsg}`));
+            console.log(chalk.yellow('Marking as approved (manual merge needed).'));
+          }
+        }
+      } else if (shouldMerge && !pr.github_pr_number) {
+        console.log(chalk.yellow('No GitHub PR number linked - marking as approved only.'));
+      }
+
+      const newStatus = actuallyMerged ? 'merged' : 'approved';
+      const reviewNotes = !shouldMerge
+        ? markManualMergeRequired(options.notes)
+        : (options.notes ?? null);
+
+      updatePullRequest(db.db, prId, {
+        status: newStatus,
+        reviewedBy: options.from || pr.reviewed_by,
+        reviewNotes,
+      });
+
+      if (storyId && newStatus === 'merged') {
+        updateStory(db.db, storyId, { status: 'merged' });
+      }
+
+      db.save();
+
+      // Sync status change to Jira
+      if (storyId && newStatus === 'merged') {
+        await syncStatusForStory(root, db.db, storyId, 'merged');
+      }
+
+      // Immediately attempt to auto-merge approved PRs instead of waiting for manager daemon cycle
+      if (newStatus === 'approved' && shouldMerge) {
+        console.log(chalk.gray('Attempting immediate auto-merge...'));
+        const merged = await autoMergeApprovedPRs(root, db);
+        if (merged > 0) {
+          console.log(chalk.green(`✓ Auto-merged ${merged} approved PR(s) immediately`));
+        } else {
+          console.log(chalk.gray('Auto-merge will be retried by manager daemon'));
+        }
+      }
+
+      if (!actuallyMerged && shouldMerge) {
+        console.log(chalk.green(`PR ${prId} approved.`));
+        if (newStatus !== 'merged') {
+          console.log(chalk.gray('PR will be auto-merged when checks pass.'));
+        }
+      } else if (!shouldMerge) {
+        console.log(chalk.green(`PR ${prId} approved.`));
+        console.log(chalk.gray('Manual merge is needed.'));
+      }
+
+      if (options.from) {
+        createLog(db.db, {
+          agentId: options.from,
+          storyId: storyId || undefined,
+          eventType: newStatus === 'merged' ? 'PR_MERGED' : 'PR_APPROVED',
+          message: `${newStatus === 'merged' ? 'Merged' : 'Approved'} PR ${prId}${storyId ? ` (${storyId})` : ''}`,
+          metadata: { pr_id: prId, branch: pr.branch_name, story_id: storyId },
+        });
+        db.save();
+      }
+    });
+  });
+
+// Reject PR
+prCommand
+  .command('reject <pr-id>')
+  .description('Reject a PR and send back for fixes')
+  .requiredOption('-r, --reason <reason>', 'Reason for rejection')
+  .option('--from <session>', 'QA agent session')
+  .action(async (prId: string, options: { reason: string; from?: string }) => {
+    await withHiveContext(async ({ root, db }) => {
+      const pr = requirePullRequest(db.db, prId);
+
+      updatePullRequest(db.db, prId, {
+        status: 'rejected',
+        reviewedBy: options.from || pr.reviewed_by,
+        reviewNotes: options.reason,
+      });
+
+      // Update story status - extract from branch name if not directly linked
+      let storyId = pr.story_id;
+      if (!storyId && pr.branch_name) {
+        storyId = extractStoryIdFromBranch(pr.branch_name);
+      }
+      if (storyId) {
+        updateStory(db.db, storyId, { status: 'qa_failed' });
+      }
+
+      db.save();
+
+      // Sync status change to Jira
+      if (storyId) {
+        await syncStatusForStory(root, db.db, storyId, 'qa_failed');
+      }
+
+      console.log(chalk.yellow(`PR ${prId} rejected.`));
+      console.log(chalk.gray(`Reason: ${options.reason}`));
+
+      // Auto-notify the developer via tmux if their session is running
+      if (pr.submitted_by) {
+        try {
+          if (await isTmuxSessionRunning(pr.submitted_by)) {
+            await sendToTmuxSession(
+              pr.submitted_by,
+              `# PR REJECTED: ${prId}\n# Reason: ${options.reason}\n# Please fix the issues and resubmit.`
+            );
+            console.log(chalk.green(`Developer ${pr.submitted_by} notified via tmux`));
+          } else {
+            console.log(chalk.cyan(`\nNotify the developer:`));
+            console.log(
+              chalk.gray(
+                `  hive msg send ${pr.submitted_by} "PR rejected: ${options.reason}" --from ${options.from || 'qa'}`
+              )
+            );
+          }
+        } catch (_error) {
+          console.log(chalk.cyan(`\nNotify the developer:`));
+          console.log(
+            chalk.gray(
+              `  hive msg send ${pr.submitted_by} "PR rejected: ${options.reason}" --from ${options.from || 'qa'}`
+            )
+          );
+        }
+      }
+
+      if (options.from) {
+        createLog(db.db, {
+          agentId: options.from,
+          storyId: storyId || undefined,
+          eventType: 'PR_REJECTED',
+          message: `Rejected PR ${prId}${storyId ? ` (${storyId})` : ''}: ${options.reason}`,
+          metadata: { pr_id: prId, branch: pr.branch_name, story_id: storyId },
+        });
+        db.save();
+      }
+    });
+  });
+
+// Sync GitHub PRs into the merge queue
+prCommand
+  .command('sync')
+  .description('Import open GitHub PRs into the merge queue')
+  .option('-r, --repo <path>', 'Repository path (relative to repos/)')
+  .action(async (options: { repo?: string }) => {
+    await withHiveContext(async ({ root, paths, db }) => {
+      const { existingBranches, existingPrNumbers } = getExistingPRIdentifiers(db.db, false);
+
+      // Find repo directory
+      const repoDir = options.repo ? `${root}/repos/${options.repo}` : process.cwd();
+
+      console.log(chalk.cyan(`Checking for open PRs in ${repoDir}...`));
+
+      let result;
+      try {
+        result = await syncOpenGitHubPRs(db.db, repoDir, null, existingBranches, existingPrNumbers);
+      } catch (err) {
+        console.error(chalk.red('Failed to list GitHub PRs. Is gh CLI authenticated?'), err);
+        process.exit(1);
+      }
+
+      for (const pr of result.imported) {
+        console.log(chalk.green(`  Imported: PR #${pr.number} (${pr.branch}) → ${pr.prId}`));
+      }
+
+      db.save();
+
+      if (result.synced > 0) {
+        console.log(chalk.green(`\nImported ${result.synced} PR(s) into merge queue.`));
+
+        // Trigger QA check
+        try {
+          const config = loadConfig(paths.hiveDir);
+          const clusterStatus = config.cluster.enabled
+            ? await fetchLocalClusterStatus(config.cluster)
+            : null;
+
+          if (!config.cluster.enabled || clusterStatus?.is_leader) {
+            const scheduler = new Scheduler(db.db, {
+              scaling: config.scaling,
+              models: config.models,
+              rootDir: root,
+              saveFn: () => db.save(),
+              hiveConfig: config,
+            });
+            await scheduler.checkMergeQueue();
+            db.save();
+            console.log(chalk.gray('QA agents notified.'));
+          }
+        } catch {
+          // Non-fatal
+        }
+      } else {
+        console.log(chalk.yellow('\nNo new PRs to import.'));
+      }
+    });
+  });
+
+// Show recently closed PRs with reasons
+prCommand
+  .command('closed')
+  .description('Show recently closed PRs with close reasons')
+  .option('-n, --limit <number>', 'Number of entries to show', '20')
+  .option('--json', 'Output as JSON')
+  .action(async (options: { limit?: string; json?: boolean }) => {
+    await withReadOnlyHiveContext(async ({ db }) => {
+      const limit = parseInt(options.limit ?? '20', 10);
+      const logs = getLogsByEventType(db.db, 'PR_CLOSED', limit);
+
+      if (options.json) {
+        console.log(JSON.stringify(logs, null, 2));
+        return;
+      }
+
+      if (logs.length === 0) {
+        console.log(chalk.yellow('No recently closed PRs found.'));
+        return;
+      }
+
+      console.log(chalk.bold('\nRecently Closed PRs:\n'));
+      console.log(
+        chalk.gray(`${'Timestamp'.padEnd(22)} ${'Story'.padEnd(20)} ${'PR#'.padEnd(6)} ${'Reason'}`)
+      );
+      console.log(chalk.gray('─'.repeat(80)));
+
+      for (const log of logs) {
+        const ts = new Date(log.timestamp).toLocaleString();
+        const story = (log.story_id ?? '-').padEnd(20);
+        const metadata =
+          typeof log.metadata === 'string'
+            ? (JSON.parse(log.metadata) as Record<string, unknown>)
+            : ((log.metadata as Record<string, unknown> | null) ?? {});
+        const prNum = String(metadata?.github_pr_number ?? '-').padEnd(6);
+        const supersededBy =
+          metadata?.superseded_by_pr_number != null
+            ? ` (superseded by PR #${metadata.superseded_by_pr_number})`
+            : '';
+        const reason = String(metadata?.reason ?? 'closed') + supersededBy;
+
+        console.log(
+          `${chalk.gray(ts.padEnd(22))} ${chalk.cyan(story)} ${chalk.yellow(prNum)} ${reason}`
+        );
+      }
+      console.log();
+    });
+  });

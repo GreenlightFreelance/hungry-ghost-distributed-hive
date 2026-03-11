@@ -1,0 +1,111 @@
+HUNGRY GHOST HIVE LICENSE
+
+Copyright (c) 2026 Hungry Ghost. All Rights Reserved.
+
+TERMS AND CONDITIONS
+
+1. DEFINITIONS
+
+"Software" refers to the Hive system, including all source code, documentation,
+and associated files in this repository.
+
+"Contribution" means any work of authorship submitted to the project for
+inclusion in the Software.
+
+"Contributor" means any individual or entity that submits a Contribution.
+
+2. GRANT OF RIGHTS
+
+Subject to the terms of this License, you are granted the following rights:
+
+a) USE: You may use the Software for any purpose, including commercial projects.
+
+b) MODIFY: You may modify, adapt, and create derivative works of the Software
+   for your own internal use.
+
+c) CONTRIBUTE: You may submit Contributions to the official repository. By
+   submitting a Contribution, you grant Hungry Ghost a perpetual, worldwide,
+   non-exclusive, royalty-free, irrevocable license to use, reproduce, modify,
+   distribute, and sublicense your Contribution as part of the Software.
+
+3. RESTRICTIONS
+
+The following actions are expressly PROHIBITED without prior written permission
+from Hungry Ghost:
+
+a) REDISTRIBUTION: You may not distribute, share, publish, or otherwise make
+   available the Software or any derivative works to any third party, whether
+   in source or binary form.
+
+b) SELLING: You may not sell, license, sublicense, lease, or otherwise
+   commercialize the Software itself or any derivative works.
+
+c) COMPETING PRODUCTS: You may not redistribute the Software, in whole or in
+   part, as part of a competing product or service.
+
+Note: You ARE permitted to use the Software internally to build and sell your
+own products and services. The restriction is on redistributing or selling the
+Software itself, not on using it as a tool in your business.
+
+4. CONTRIBUTIONS
+
+a) All Contributions must be submitted through official channels (pull requests
+   to the official repository).
+
+b) By submitting a Contribution, you represent that you have the right to grant
+   the license in Section 2(c) and that your Contribution does not violate any
+   third-party rights.
+
+c) Hungry Ghost reserves the right to accept or reject any Contribution at its
+   sole discretion.
+
+d) Accepted Contributions become part of the Software and are subject to this
+   License.
+
+5. INTELLECTUAL PROPERTY
+
+a) Hungry Ghost retains all right, title, and interest in and to the Software,
+   including all intellectual property rights.
+
+b) This License does not grant you any rights to use Hungry Ghost's trademarks,
+   service marks, or trade names.
+
+6. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+HUNGRY GHOST BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING
+FROM THE USE OF THE SOFTWARE.
+
+7. TERMINATION
+
+a) This License is effective until terminated.
+
+b) Your rights under this License will terminate automatically without notice
+   if you fail to comply with any term of this License.
+
+c) Upon termination, you must destroy all copies of the Software in your
+   possession.
+
+8. GENERAL
+
+a) This License constitutes the entire agreement between you and Hungry Ghost
+   concerning the Software.
+
+b) This License shall be governed by the laws of the jurisdiction in which
+   Hungry Ghost is incorporated.
+
+c) If any provision of this License is held to be unenforceable, such provision
+   shall be reformed only to the extent necessary to make it enforceable.
+
+For permissions beyond the scope of this License, contact: legal@hungryghost.io
+
+---
+
+SUMMARY (not legally binding):
+- You CAN use the software for any purpose, including commercial projects
+- You CAN modify the software for your own use
+- You CAN contribute improvements via pull requests
+- You CANNOT redistribute the software to others
+- You CANNOT sell or sublicense the software itself

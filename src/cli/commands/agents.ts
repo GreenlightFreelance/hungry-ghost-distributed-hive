@@ -1,0 +1,297 @@
+// Licensed under the Hungry Ghost Hive License. See LICENSE.
+
+import chalk from 'chalk';
+import { execSync } from 'child_process';
+import { Command } from 'commander';
+import {
+  deleteAgent,
+  getActiveAgents,
+  getAgentByTmuxSession,
+  getAgentsByStatus,
+  getAllAgents,
+  updateAgent,
+} from '../../db/queries/agents.js';
+import { createLog, getLogsByAgent } from '../../db/queries/logs.js';
+import { removeWorktree } from '../../git/worktree.js';
+import { requireAgent } from '../../utils/cli-helpers.js';
+import { statusColor } from '../../utils/logger.js';
+import { withHiveContext, withReadOnlyHiveContext } from '../../utils/with-hive-context.js';
+
+export const agentsCommand = new Command('agents').description('Manage agents');
+
+agentsCommand
+  .command('list')
+  .description('List all agents')
+  .option('--active', 'Show only active agents')
+  .option('--json', 'Output as JSON')
+  .action(async (options: { active?: boolean; json?: boolean }) => {
+    await withReadOnlyHiveContext(async ({ db }) => {
+      const agents = options.active ? getActiveAgents(db.db) : getAllAgents(db.db);
+
+      if (options.json) {
+        console.log(JSON.stringify(agents, null, 2));
+        return;
+      }
+
+      if (agents.length === 0) {
+        console.log(chalk.yellow('No agents found.'));
+        return;
+      }
+
+      console.log(chalk.bold('\nAgents:\n'));
+
+      // Header
+      console.log(
+        chalk.gray(
+          `${'ID'.padEnd(25)} ${'Type'.padEnd(12)} ${'Model'.padEnd(10)} ${'Team'.padEnd(15)} ${'Status'.padEnd(12)} ${'Current Story'}`
+        )
+      );
+      console.log(chalk.gray('─'.repeat(100)));
+
+      for (const agent of agents) {
+        const team = agent.team_id || '-';
+        const story = agent.current_story_id || '-';
+        const model = agent.model || '-';
+        console.log(
+          `${chalk.cyan(agent.id.padEnd(25))} ${agent.type.padEnd(12)} ${model.padEnd(10)} ${team.padEnd(15)} ${statusColor(agent.status).padEnd(12)} ${story}`
+        );
+      }
+      console.log();
+    });
+  });
+
+agentsCommand
+  .command('logs <agent-id>')
+  .description('View agent logs')
+  .option('-n, --limit <number>', 'Number of logs to show', '50')
+  .option('--json', 'Output as JSON')
+  .action(async (agentId: string, options: { limit: string; json?: boolean }) => {
+    await withReadOnlyHiveContext(async ({ db }) => {
+      requireAgent(db.db, agentId);
+
+      const logs = getLogsByAgent(db.db, agentId, parseInt(options.limit, 10));
+
+      if (options.json) {
+        console.log(JSON.stringify(logs, null, 2));
+        return;
+      }
+
+      if (logs.length === 0) {
+        console.log(chalk.yellow('No logs found for this agent.'));
+        return;
+      }
+
+      console.log(chalk.bold(`\nLogs for ${agentId}:\n`));
+
+      for (const log of logs) {
+        const time = log.timestamp.substring(0, 19).replace('T', ' ');
+        const storyInfo = log.story_id ? chalk.cyan(` [${log.story_id}]`) : '';
+        const message = log.message ? `: ${log.message}` : '';
+
+        console.log(`${chalk.gray(time)}${storyInfo} ${chalk.bold(log.event_type)}${message}`);
+
+        if (log.metadata) {
+          try {
+            const meta = JSON.parse(log.metadata);
+            console.log(chalk.gray(`  ${JSON.stringify(meta)}`));
+          } catch (_error) {
+            // Ignore parse errors
+          }
+        }
+      }
+      console.log();
+    });
+  });
+
+agentsCommand
+  .command('inspect <agent-id>')
+  .description('View detailed agent state')
+  .action(async (agentId: string) => {
+    await withReadOnlyHiveContext(async ({ db }) => {
+      const agent = requireAgent(db.db, agentId);
+
+      console.log(chalk.bold(`\nAgent: ${agent.id}\n`));
+      console.log(chalk.gray(`Type:          ${agent.type}`));
+      console.log(chalk.gray(`Model:         ${agent.model || '-'}`));
+      console.log(chalk.gray(`Team:          ${agent.team_id || '-'}`));
+      console.log(chalk.gray(`Status:        ${statusColor(agent.status)}`));
+      console.log(chalk.gray(`Tmux Session:  ${agent.tmux_session || '-'}`));
+      console.log(chalk.gray(`Current Story: ${agent.current_story_id || '-'}`));
+      console.log(chalk.gray(`Created:       ${agent.created_at}`));
+      console.log(chalk.gray(`Updated:       ${agent.updated_at}`));
+
+      if (agent.memory_state) {
+        console.log(chalk.bold('\nMemory State:'));
+        try {
+          const state = JSON.parse(agent.memory_state);
+          console.log(JSON.stringify(state, null, 2));
+        } catch (_error) {
+          console.log(agent.memory_state);
+        }
+      }
+
+      // Show recent logs
+      const logs = getLogsByAgent(db.db, agentId, 5);
+      if (logs.length > 0) {
+        console.log(chalk.bold('\nRecent Activity:'));
+        for (const log of logs) {
+          const time = log.timestamp.substring(11, 19);
+          const message = log.message ? `: ${log.message.substring(0, 50)}` : '';
+          console.log(chalk.gray(`  ${time} | ${log.event_type}${message}`));
+        }
+      }
+      console.log();
+    });
+  });
+
+agentsCommand
+  .command('cleanup')
+  .description('Clean up terminated agents from the database')
+  .option('--dry-run', 'Show what would be deleted without actually deleting')
+  .action(async (options: { dryRun?: boolean }) => {
+    await withHiveContext(async ({ root, db }) => {
+      const terminatedAgents = getAgentsByStatus(db.db, 'terminated');
+
+      if (terminatedAgents.length === 0) {
+        console.log(chalk.green('No terminated agents to clean up.'));
+        return;
+      }
+
+      console.log(chalk.yellow(`\nFound ${terminatedAgents.length} terminated agent(s):\n`));
+
+      // Group by type for summary
+      const byType = terminatedAgents.reduce(
+        (acc, agent) => {
+          acc[agent.type] = (acc[agent.type] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
+
+      for (const [type, count] of Object.entries(byType)) {
+        console.log(chalk.gray(`  ${type}: ${count}`));
+      }
+      console.log();
+
+      if (options.dryRun) {
+        console.log(chalk.yellow('Dry run - no agents were deleted.'));
+        return;
+      }
+
+      // Delete terminated agents and their worktrees
+      let deleted = 0;
+      for (const agent of terminatedAgents) {
+        try {
+          // Remove worktree if exists
+          if (agent.worktree_path) {
+            const result = removeWorktree(root, agent.worktree_path);
+            if (!result.success) {
+              console.error(
+                chalk.yellow(`Warning: Failed to remove worktree for ${agent.id}: ${result.error}`)
+              );
+            }
+          }
+
+          deleteAgent(db.db, agent.id);
+          deleted++;
+        } catch (err) {
+          console.error(
+            chalk.red(
+              `Failed to delete ${agent.id}: ${err instanceof Error ? err.message : 'Unknown error'}`
+            )
+          );
+        }
+      }
+
+      console.log(chalk.green(`✓ Cleaned up ${deleted} terminated agent(s).`));
+    });
+  });
+
+agentsCommand
+  .command('self-terminate')
+  .description('Cleanly self-terminate the current agent')
+  .option(
+    '--session <session>',
+    'Tmux session name (defaults to HIVE_SESSION env var or current tmux session)'
+  )
+  .action(async (options: { session?: string }) => {
+    const sessionName = options.session || process.env.HIVE_SESSION || getCurrentTmuxSession();
+
+    if (!sessionName) {
+      console.error(
+        chalk.red('Could not determine tmux session. Use --session or set HIVE_SESSION.')
+      );
+      process.exit(1);
+    }
+
+    await selfTerminate(sessionName);
+  });
+
+export async function selfTerminate(sessionName: string): Promise<void> {
+  await withHiveContext(async ({ root, db }) => {
+    const agent = getAgentByTmuxSession(db.db, sessionName);
+    if (!agent) {
+      console.error(chalk.red(`No agent found for tmux session: ${sessionName}`));
+      process.exit(1);
+    }
+
+    if (agent.status === 'terminated') {
+      console.log(chalk.yellow(`Agent ${agent.id} is already terminated.`));
+      return;
+    }
+
+    // Clean up worktree if one exists
+    if (agent.worktree_path) {
+      const result = removeWorktree(root, agent.worktree_path);
+      if (!result.success) {
+        console.error(
+          chalk.yellow(`Warning: Failed to remove worktree for ${agent.id}: ${result.error}`)
+        );
+      }
+    }
+
+    // Mark agent as terminated in DB
+    updateAgent(db.db, agent.id, {
+      status: 'terminated',
+      currentStoryId: null,
+    });
+
+    // Log the self-termination event
+    createLog(db.db, {
+      agentId: agent.id,
+      eventType: 'AGENT_TERMINATED',
+      message: `Agent self-terminated (session: ${sessionName})`,
+    });
+
+    db.save();
+
+    console.log(chalk.green(`✓ Agent ${agent.id} self-terminated.`));
+
+    // Kill own tmux session as the final action.
+    // Use a backgrounded shell command with a delay so the process can exit cleanly.
+    try {
+      execSync(`(sleep 1 && tmux kill-session -t ${shellEscape(sessionName)}) &`, {
+        stdio: 'ignore',
+        shell: '/bin/sh',
+      });
+    } catch (_error) {
+      // Best-effort: session may already be gone
+    }
+  });
+}
+
+function getCurrentTmuxSession(): string | undefined {
+  try {
+    return (
+      execSync('tmux display-message -p "#S"', { stdio: ['pipe', 'pipe', 'ignore'] })
+        .toString()
+        .trim() || undefined
+    );
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function shellEscape(s: string): string {
+  return `'${s.replace(/'/g, `'"'"'`)}'`;
+}

@@ -1,0 +1,4 @@
+[submodule "repos/hungry-ghost-hive"]
+	path = repos/hungry-ghost-hive
+	url = https://github.com/nikrich/hungry-ghost-hive
+	branch = main
