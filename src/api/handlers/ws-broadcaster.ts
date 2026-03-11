@@ -7,6 +7,7 @@ import {
 } from '@aws-sdk/client-apigatewaymanagementapi';
 import { DeleteItemCommand, DynamoDBClient, QueryCommand } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { getAWSConfig } from '../../adapters/aws-config.js';
 
 import type { ConnectionRecord } from './ws-handler.js';
 
@@ -42,12 +43,13 @@ export class WebSocketBroadcaster {
     apiClient?: ApiGatewayManagementApiClient,
     tableName?: string
   ) {
-    this.dynamo = dynamo || new DynamoDBClient({ region: AWS_REGION });
+    const awsConfig = getAWSConfig(AWS_REGION);
+    this.dynamo = dynamo || new DynamoDBClient(awsConfig);
     this.tableName = tableName || CONNECTIONS_TABLE;
     this.apiClient =
       apiClient ||
       new ApiGatewayManagementApiClient({
-        region: AWS_REGION,
+        ...awsConfig,
         endpoint: WEBSOCKET_ENDPOINT,
       });
   }

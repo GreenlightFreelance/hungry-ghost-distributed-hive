@@ -9,6 +9,7 @@ import {
   ScanCommand,
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { getAWSConfig } from '../../adapters/aws-config.js';
 import type { StateItem } from '../../adapters/dynamo-client.js';
 
 const TABLE_NAME = process.env.DYNAMODB_TABLE || 'distributed-hive-state';
@@ -19,8 +20,9 @@ let clientInstance: DynamoDBClient | null = null;
 
 export function getDynamoClient(): DynamoDBClient {
   if (!clientInstance) {
+    const awsConfig = getAWSConfig();
     clientInstance = new DynamoDBClient({
-      region: process.env.AWS_REGION || 'us-east-1',
+      ...awsConfig,
       ...(process.env.DYNAMODB_ENDPOINT ? { endpoint: process.env.DYNAMODB_ENDPOINT } : {}),
     });
   }

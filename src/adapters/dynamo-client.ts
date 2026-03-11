@@ -7,6 +7,7 @@ import {
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { getAWSConfig } from './aws-config.js';
 
 export interface StateItem {
   PK: string; // "RUN#run-abc123"
@@ -31,8 +32,9 @@ export class DynamoClient {
 
   constructor(config: DynamoClientConfig) {
     this.tableName = config.tableName;
+    const awsConfig = getAWSConfig(config.region);
     this.client = new DynamoDBClient({
-      region: config.region || 'us-east-1',
+      ...awsConfig,
       ...(config.endpoint ? { endpoint: config.endpoint } : {}),
     });
   }

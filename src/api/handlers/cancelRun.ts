@@ -1,6 +1,7 @@
 // Licensed under the Hungry Ghost Hive License. See LICENSE.
 
 import { ECSClient, StopTaskCommand } from '@aws-sdk/client-ecs';
+import { getAWSConfig } from '../../adapters/aws-config.js';
 import { getRunMeta, putRunMeta } from '../shared/dynamo.js';
 import {
   type APIGatewayProxyEvent,
@@ -18,7 +19,7 @@ export function setECSClient(client: ECSClient): void {
 }
 
 function getECS(): ECSClient {
-  if (!ecsClient) ecsClient = new ECSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+  if (!ecsClient) ecsClient = new ECSClient(getAWSConfig());
   return ecsClient;
 }
 

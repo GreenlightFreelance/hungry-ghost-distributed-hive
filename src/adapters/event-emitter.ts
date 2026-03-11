@@ -1,6 +1,7 @@
 // Licensed under the Hungry Ghost Hive License. See LICENSE.
 
 import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
+import { getAWSConfig } from './aws-config.js';
 
 export type HiveDetailType =
   | 'story_update'
@@ -30,8 +31,9 @@ export class EventEmitter {
 
   constructor(config: EventEmitterConfig) {
     this.eventBusName = config.eventBusName;
+    const awsConfig = getAWSConfig(config.region);
     this.client = new EventBridgeClient({
-      region: config.region || 'us-east-1',
+      ...awsConfig,
       ...(config.endpoint ? { endpoint: config.endpoint } : {}),
     });
   }

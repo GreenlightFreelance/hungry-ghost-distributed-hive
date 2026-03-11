@@ -3,6 +3,7 @@
 import { ECSClient, RunTaskCommand } from '@aws-sdk/client-ecs';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { nanoid } from 'nanoid';
+import { getAWSConfig } from '../../adapters/aws-config.js';
 import { putRunMeta } from '../shared/dynamo.js';
 import {
   type APIGatewayProxyEvent,
@@ -31,12 +32,12 @@ export function setECSClient(client: ECSClient): void {
 }
 
 function getSQS(): SQSClient {
-  if (!sqsClient) sqsClient = new SQSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+  if (!sqsClient) sqsClient = new SQSClient(getAWSConfig());
   return sqsClient;
 }
 
 function getECS(): ECSClient {
-  if (!ecsClient) ecsClient = new ECSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+  if (!ecsClient) ecsClient = new ECSClient(getAWSConfig());
   return ecsClient;
 }
 

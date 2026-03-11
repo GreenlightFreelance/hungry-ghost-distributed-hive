@@ -7,6 +7,7 @@ import {
   QueryCommand,
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { getAWSConfig } from '../../adapters/aws-config.js';
 
 const CONNECTIONS_TABLE = process.env.CONNECTIONS_TABLE || 'distributed-hive-connections';
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
@@ -44,7 +45,7 @@ export class WebSocketHandler {
   private tableName: string;
 
   constructor(client?: DynamoDBClient, tableName?: string) {
-    this.client = client || new DynamoDBClient({ region: AWS_REGION });
+    this.client = client || new DynamoDBClient(getAWSConfig(AWS_REGION));
     this.tableName = tableName || CONNECTIONS_TABLE;
   }
 
