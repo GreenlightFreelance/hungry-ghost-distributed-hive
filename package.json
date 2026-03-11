@@ -37,6 +37,7 @@
     "@aws-sdk/client-ecs": "^3.1006.0",
     "@aws-sdk/client-eventbridge": "^3.1006.0",
     "@aws-sdk/client-sqs": "^3.1006.0",
+    "@aws-sdk/lib-dynamodb": "^3.1006.0",
     "@aws-sdk/util-dynamodb": "^3.996.2",
     "@inquirer/prompts": "^8.2.0",
     "@types/proper-lockfile": "^4.1.4",

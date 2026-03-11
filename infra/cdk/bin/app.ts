@@ -58,6 +58,8 @@ const apiStack = new ApiStack(app, 'DistributedHiveApi', {
   lambdaSecurityGroup: vpcStack.lambdaSecurityGroup,
   fargateSecurityGroup: vpcStack.fargateSecurityGroup,
   eventBusName: storageStack.eventBusName,
+  fileSystem: storageStack.fileSystem,
+  accessPoint: storageStack.accessPoint,
 });
 apiStack.addDependency(storageStack);
 apiStack.addDependency(sqsStack);

@@ -4,6 +4,9 @@ import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as efs from 'aws-cdk-lib/aws-efs';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -19,6 +22,8 @@ export interface ApiStackProps extends cdk.StackProps {
   lambdaSecurityGroup: ec2.ISecurityGroup;
   fargateSecurityGroup: ec2.ISecurityGroup;
   eventBusName: string;
+  fileSystem?: efs.IFileSystem;
+  accessPoint?: efs.IAccessPoint;
 }
 
 interface RouteConfig {
@@ -268,6 +273,115 @@ export class ApiStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [props.lambdaSecurityGroup],
       logGroup: broadcasterLogGroup,
+    });
+
+    // ── API Gateway throttling (rate limiting) ──
+    const defaultStage = this.httpApi.defaultStage?.node.defaultChild as apigatewayv2.CfnStage;
+    if (defaultStage) {
+      defaultStage.addPropertyOverride('DefaultRouteSettings', {
+        ThrottlingBurstLimit: 50,
+        ThrottlingRateLimit: 100,
+      });
+    }
+
+    // ── Run timeout enforcement Lambda (every 15 min) ──
+    const timeoutLambdaRole = new iam.Role(this, 'RunTimeoutRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+      ],
+    });
+
+    props.table.grantReadWriteData(timeoutLambdaRole);
+
+    timeoutLambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['ecs:StopTask'],
+        resources: ['*'],
+        conditions: {
+          ArnEquals: { 'ecs:cluster': props.cluster.clusterArn },
+        },
+      })
+    );
+
+    const timeoutLogGroup = new logs.LogGroup(this, 'RunTimeoutLogs', {
+      logGroupName: '/lambda/distributed-hive-run-timeout',
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const runTimeoutFn = new lambda.Function(this, 'RunTimeoutHandler', {
+      functionName: 'distributed-hive-run-timeout',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda-placeholder', { exclude: ['**'] }),
+      environment: {
+        DYNAMODB_TABLE: props.table.tableName,
+        ECS_CLUSTER_ARN: props.cluster.clusterArn,
+        MAX_RUN_HOURS: '24',
+      },
+      role: timeoutLambdaRole,
+      timeout: cdk.Duration.minutes(2),
+      memorySize: 256,
+      logGroup: timeoutLogGroup,
+    });
+
+    new events.Rule(this, 'RunTimeoutSchedule', {
+      ruleName: 'distributed-hive-run-timeout',
+      schedule: events.Schedule.rate(cdk.Duration.minutes(15)),
+      targets: [new targets.LambdaFunction(runTimeoutFn)],
+    });
+
+    // ── EFS cleanup Lambda (daily cron) ──
+    const efsCleanupRole = new iam.Role(this, 'EfsCleanupRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaVPCAccessExecutionRole'),
+      ],
+    });
+
+    if (props.fileSystem) {
+      props.fileSystem.grant(
+        efsCleanupRole,
+        'elasticfilesystem:ClientMount',
+        'elasticfilesystem:ClientWrite'
+      );
+    }
+
+    const efsCleanupLogGroup = new logs.LogGroup(this, 'EfsCleanupLogs', {
+      logGroupName: '/lambda/distributed-hive-efs-cleanup',
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const efsCleanupFn = new lambda.Function(this, 'EfsCleanupHandler', {
+      functionName: 'distributed-hive-efs-cleanup',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda-placeholder', { exclude: ['**'] }),
+      environment: {
+        EFS_MOUNT_PATH: '/mnt/efs',
+        EFS_MAX_AGE_DAYS: '30',
+      },
+      role: efsCleanupRole,
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 256,
+      vpc: props.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [props.lambdaSecurityGroup],
+      logGroup: efsCleanupLogGroup,
+      ...(props.fileSystem && props.accessPoint
+        ? {
+            filesystem: lambda.FileSystem.fromEfsAccessPoint(props.accessPoint, '/mnt/efs'),
+          }
+        : {}),
+    });
+
+    new events.Rule(this, 'EfsCleanupSchedule', {
+      ruleName: 'distributed-hive-efs-cleanup',
+      schedule: events.Schedule.rate(cdk.Duration.days(1)),
+      targets: [new targets.LambdaFunction(efsCleanupFn)],
     });
 
     // Outputs

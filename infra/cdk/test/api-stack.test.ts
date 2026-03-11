@@ -32,6 +32,8 @@ function createTestStacks() {
     lambdaSecurityGroup: vpcStack.lambdaSecurityGroup,
     fargateSecurityGroup: vpcStack.fargateSecurityGroup,
     eventBusName: storageStack.eventBusName,
+    fileSystem: storageStack.fileSystem,
+    accessPoint: storageStack.accessPoint,
   });
   return { app, apiStack };
 }
@@ -59,8 +61,8 @@ describe('ApiStack', () => {
   });
 
   describe('REST Lambda Functions', () => {
-    it('creates 11 REST handler functions', () => {
-      template.resourceCountIs('AWS::Lambda::Function', 13); // 11 REST + ws-handler + broadcaster
+    it('creates 11 REST handler functions plus scheduled lambdas', () => {
+      template.resourceCountIs('AWS::Lambda::Function', 15); // 11 REST + ws-handler + broadcaster + run-timeout + efs-cleanup
     });
 
     it('creates createRun handler', () => {
@@ -326,6 +328,67 @@ describe('ApiStack', () => {
       template.hasResourceProperties('AWS::Logs::LogGroup', {
         LogGroupName: '/lambda/distributed-hive-broadcaster',
         RetentionInDays: 14,
+      });
+    });
+  });
+
+  describe('Run Timeout Lambda', () => {
+    it('creates run-timeout handler', () => {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'distributed-hive-run-timeout',
+        Runtime: 'nodejs20.x',
+        Timeout: 120,
+        MemorySize: 256,
+      });
+    });
+
+    it('configures timeout handler with environment variables', () => {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'distributed-hive-run-timeout',
+        Environment: {
+          Variables: Match.objectLike({
+            DYNAMODB_TABLE: Match.anyValue(),
+            ECS_CLUSTER_ARN: Match.anyValue(),
+            MAX_RUN_HOURS: '24',
+          }),
+        },
+      });
+    });
+
+    it('creates EventBridge schedule rule for run timeout (every 15 min)', () => {
+      template.hasResourceProperties('AWS::Events::Rule', {
+        RuleName: 'distributed-hive-run-timeout',
+        ScheduleExpression: 'rate(15 minutes)',
+      });
+    });
+  });
+
+  describe('EFS Cleanup Lambda', () => {
+    it('creates efs-cleanup handler', () => {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'distributed-hive-efs-cleanup',
+        Runtime: 'nodejs20.x',
+        Timeout: 300,
+        MemorySize: 256,
+      });
+    });
+
+    it('creates EventBridge schedule rule for EFS cleanup (daily)', () => {
+      template.hasResourceProperties('AWS::Events::Rule', {
+        RuleName: 'distributed-hive-efs-cleanup',
+        ScheduleExpression: 'rate(1 day)',
+      });
+    });
+
+    it('configures EFS cleanup with mount path and retention days', () => {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'distributed-hive-efs-cleanup',
+        Environment: {
+          Variables: Match.objectLike({
+            EFS_MOUNT_PATH: '/mnt/efs',
+            EFS_MAX_AGE_DAYS: '30',
+          }),
+        },
       });
     });
   });

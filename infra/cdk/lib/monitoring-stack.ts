@@ -138,6 +138,44 @@ export class MonitoringStack extends cdk.Stack {
     });
     estimatedCostAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(this.alarmTopic));
 
+    // Daily cost budget alarm — alerts if daily cost exceeds $100
+    const dailyCostMetric = new cloudwatch.Metric({
+      namespace,
+      metricName: 'DailyCost',
+      statistic: 'Sum',
+      period: cdk.Duration.hours(24),
+    });
+
+    const dailyCostAlarm = new cloudwatch.Alarm(this, 'DailyCostBudgetAlarm', {
+      alarmName: 'distributed-hive-daily-cost-budget',
+      alarmDescription: 'Daily cost exceeds $100 budget',
+      metric: dailyCostMetric,
+      threshold: 100,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    dailyCostAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(this.alarmTopic));
+
+    // Spot interruption alarm
+    const spotInterruptionMetric = new cloudwatch.Metric({
+      namespace,
+      metricName: 'SpotInterruptions',
+      statistic: 'Sum',
+      period: cdk.Duration.minutes(5),
+    });
+
+    const spotInterruptionAlarm = new cloudwatch.Alarm(this, 'SpotInterruptionAlarm', {
+      alarmName: 'distributed-hive-spot-interruptions',
+      alarmDescription: 'Spot interruptions detected',
+      metric: spotInterruptionMetric,
+      threshold: 0,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    spotInterruptionAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(this.alarmTopic));
+
     // CloudWatch Dashboard
     this.dashboard = new cloudwatch.Dashboard(this, 'Dashboard', {
       dashboardName: 'distributed-hive',
@@ -188,6 +226,21 @@ export class MonitoringStack extends cdk.Stack {
     );
 
     this.dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Daily Cost ($)',
+        left: [dailyCostMetric],
+        width: 12,
+        height: 6,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Spot Interruptions',
+        left: [spotInterruptionMetric],
+        width: 12,
+        height: 6,
+      })
+    );
+
+    this.dashboard.addWidgets(
       new cloudwatch.AlarmStatusWidget({
         title: 'Alarm Status',
         alarms: [
@@ -196,6 +249,8 @@ export class MonitoringStack extends cdk.Stack {
           agentStuckAlarm,
           escalationAlarm,
           estimatedCostAlarm,
+          dailyCostAlarm,
+          spotInterruptionAlarm,
         ],
         width: 24,
         height: 4,

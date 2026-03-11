@@ -107,8 +107,28 @@ describe('MonitoringStack', () => {
       });
     });
 
-    it('creates 5 alarms total', () => {
-      template.resourceCountIs('AWS::CloudWatch::Alarm', 5);
+    it('creates daily cost budget alarm (threshold: $100)', () => {
+      template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+        AlarmName: 'distributed-hive-daily-cost-budget',
+        MetricName: 'DailyCost',
+        Namespace: 'DistributedHive',
+        Threshold: 100,
+        ComparisonOperator: 'GreaterThanThreshold',
+      });
+    });
+
+    it('creates spot interruption alarm', () => {
+      template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+        AlarmName: 'distributed-hive-spot-interruptions',
+        MetricName: 'SpotInterruptions',
+        Namespace: 'DistributedHive',
+        Threshold: 0,
+        ComparisonOperator: 'GreaterThanThreshold',
+      });
+    });
+
+    it('creates 7 alarms total', () => {
+      template.resourceCountIs('AWS::CloudWatch::Alarm', 7);
     });
 
     it('all alarms notify SNS topic', () => {

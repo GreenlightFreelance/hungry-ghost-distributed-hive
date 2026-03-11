@@ -61,6 +61,16 @@ describe('EcsStack', () => {
         ],
       });
     });
+
+    it('configures Fargate Spot and on-demand capacity provider strategy', () => {
+      template.hasResourceProperties('AWS::ECS::ClusterCapacityProviderAssociations', {
+        CapacityProviders: Match.arrayWith(['FARGATE', 'FARGATE_SPOT']),
+        DefaultCapacityProviderStrategy: Match.arrayWith([
+          Match.objectLike({ CapacityProvider: 'FARGATE_SPOT', Weight: 3 }),
+          Match.objectLike({ CapacityProvider: 'FARGATE', Weight: 1, Base: 1 }),
+        ]),
+      });
+    });
   });
 
   describe('Task Definition', () => {

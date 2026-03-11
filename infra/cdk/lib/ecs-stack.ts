@@ -61,12 +61,19 @@ export class EcsStack extends cdk.Stack {
       ],
     });
 
-    // ECS Fargate cluster
+    // ECS Fargate cluster with Spot + on-demand capacity providers
     this.cluster = new ecs.Cluster(this, 'Cluster', {
       vpc: props.vpc,
       clusterName: 'distributed-hive',
       containerInsights: true,
+      enableFargateCapacityProviders: true,
     });
+
+    // Default capacity provider strategy: prefer Spot with on-demand fallback
+    this.cluster.addDefaultCapacityProviderStrategy([
+      { capacityProvider: 'FARGATE_SPOT', weight: 3, base: 0 },
+      { capacityProvider: 'FARGATE', weight: 1, base: 1 },
+    ]);
 
     // Execution role — least-privilege inline policy (no managed policy)
     const executionRole = new iam.Role(this, 'ExecutionRole', {

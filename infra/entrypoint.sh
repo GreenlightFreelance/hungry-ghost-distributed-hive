@@ -1,6 +1,35 @@
 #!/bin/bash
 set -euo pipefail
 
+# ── Graceful shutdown handler for Fargate Spot interruptions ──
+# Fargate sends SIGTERM with a 120-second grace period before SIGKILL.
+# We save hive state and agent logs to EFS so a retry can resume.
+EFS_CHECKPOINT_DIR="/workspace/checkpoints/${RUN_ID:-unknown}"
+
+graceful_shutdown() {
+  echo "[SIGTERM] Spot interruption detected. Saving state to EFS..."
+  mkdir -p "$EFS_CHECKPOINT_DIR"
+
+  # Save hive state snapshot
+  if [ -d "/workspace/.hive" ]; then
+    cp -r /workspace/.hive "$EFS_CHECKPOINT_DIR/hive-state" 2>/dev/null || true
+  fi
+
+  # Save agent logs
+  if [ -d "/workspace/agent-logs" ]; then
+    cp -r /workspace/agent-logs "$EFS_CHECKPOINT_DIR/agent-logs" 2>/dev/null || true
+  fi
+
+  # Save run metadata
+  echo "{\"runId\":\"${RUN_ID:-unknown}\",\"interruptedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"reason\":\"spot-interruption\"}" \
+    > "$EFS_CHECKPOINT_DIR/interrupt-meta.json"
+
+  echo "[SIGTERM] State saved to $EFS_CHECKPOINT_DIR. Exiting."
+  exit 0
+}
+
+trap graceful_shutdown SIGTERM SIGINT
+
 # 1. Fetch secrets from AWS Secrets Manager
 export ANTHROPIC_API_KEY=$(aws secretsmanager get-secret-value \
   --secret-id "$ANTHROPIC_KEY_ARN" --query SecretString --output text)
@@ -37,8 +66,10 @@ node /opt/hive/dist/adapters/state-sync.js \
 hive req "$REQUIREMENT_TITLE" --description "$REQUIREMENT_DESCRIPTION"
 hive assign
 
-# 8. Start manager daemon (foreground — keeps container alive)
-hive manager start --no-daemon --verbose
+# 8. Start manager daemon (background + wait — allows SIGTERM to be caught by trap)
+hive manager start --no-daemon --verbose &
+MANAGER_PID=$!
+wait $MANAGER_PID
 
 # Manager exits when all stories are merged or max runtime exceeded
 echo "Run complete. Shutting down."
