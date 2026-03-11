@@ -4,6 +4,7 @@ import { ApiStack } from '../lib/api-stack';
 import { EcsStack } from '../lib/ecs-stack';
 import { EventBridgeStack } from '../lib/eventbridge-stack';
 import { FrontendStack } from '../lib/frontend-stack';
+import { IamStack } from '../lib/iam-stack';
 import { SqsStack } from '../lib/sqs-stack';
 import { StorageStack } from '../lib/storage-stack';
 import { VpcStack } from '../lib/vpc-stack';
@@ -34,6 +35,15 @@ const ecsStack = new EcsStack(app, 'DistributedHiveEcs', {
   eventBusName: storageStack.eventBusName,
 });
 ecsStack.addDependency(storageStack);
+
+const iamStack = new IamStack(app, 'DistributedHiveIam', {
+  env,
+  tableName: storageStack.table.tableName,
+  eventBusName: storageStack.eventBusName,
+  clusterArn: ecsStack.clusterArn,
+  taskDefinitionArn: ecsStack.taskDefinition.taskDefinitionArn,
+});
+iamStack.addDependency(ecsStack);
 
 const sqsStack = new SqsStack(app, 'DistributedHiveSqs', { env });
 
