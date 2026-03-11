@@ -9,10 +9,14 @@ export interface AWSClientConfig {
   };
 }
 
-const LOCALSTACK_ENDPOINT = 'http://localhost:4566';
+const DEFAULT_LOCALSTACK_ENDPOINT = 'http://localhost:4566';
 
 export function isLocalMode(): boolean {
   return process.env.LOCAL_MODE === 'true';
+}
+
+export function getLocalStackEndpoint(): string {
+  return process.env.LOCALSTACK_ENDPOINT || DEFAULT_LOCALSTACK_ENDPOINT;
 }
 
 export function getAWSConfig(regionOverride?: string): AWSClientConfig {
@@ -21,7 +25,7 @@ export function getAWSConfig(regionOverride?: string): AWSClientConfig {
   if (isLocalMode()) {
     return {
       region,
-      endpoint: LOCALSTACK_ENDPOINT,
+      endpoint: getLocalStackEndpoint(),
       credentials: {
         accessKeyId: 'test',
         secretAccessKey: 'test',

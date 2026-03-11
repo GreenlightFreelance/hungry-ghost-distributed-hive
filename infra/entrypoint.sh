@@ -30,11 +30,17 @@ graceful_shutdown() {
 
 trap graceful_shutdown SIGTERM SIGINT
 
-# 1. Fetch secrets from AWS Secrets Manager
-export ANTHROPIC_API_KEY=$(aws secretsmanager get-secret-value \
-  --secret-id "$ANTHROPIC_KEY_ARN" --query SecretString --output text)
-export GITHUB_TOKEN=$(aws secretsmanager get-secret-value \
-  --secret-id "$GITHUB_TOKEN_ARN" --query SecretString --output text)
+# 1. Fetch secrets — LOCAL_MODE skips Secrets Manager, uses env vars directly
+if [ "${LOCAL_MODE:-false}" = "true" ]; then
+  echo "[entrypoint] LOCAL_MODE=true — using env var API keys directly (skipping Secrets Manager)"
+  export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-sk-ant-local-placeholder}"
+  export GITHUB_TOKEN="${GITHUB_TOKEN:-ghp-local-placeholder}"
+else
+  export ANTHROPIC_API_KEY=$(aws secretsmanager get-secret-value \
+    --secret-id "$ANTHROPIC_KEY_ARN" --query SecretString --output text)
+  export GITHUB_TOKEN=$(aws secretsmanager get-secret-value \
+    --secret-id "$GITHUB_TOKEN_ARN" --query SecretString --output text)
+fi
 
 # 2. Configure git
 git config --global user.name "Distributed Hive"

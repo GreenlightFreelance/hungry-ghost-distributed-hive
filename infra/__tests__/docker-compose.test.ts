@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const rootDir = join(__dirname, '..', '..');
 const compose = readFileSync(join(rootDir, 'docker-compose.yml'), 'utf-8');
 const composeTest = readFileSync(join(rootDir, 'docker-compose.test.yml'), 'utf-8');
+const composeLocal = readFileSync(join(rootDir, 'docker-compose.local.yml'), 'utf-8');
 
 describe('docker-compose.yml', () => {
   it('defines a hive service', () => {
@@ -85,5 +86,68 @@ describe('docker-compose.test.yml', () => {
 
   it('mounts a coverage volume', () => {
     expect(composeTest).toContain('./coverage');
+  });
+});
+
+describe('docker-compose.local.yml', () => {
+  it('defines localstack, hive, and dashboard services', () => {
+    expect(composeLocal).toMatch(/^\s+localstack:/m);
+    expect(composeLocal).toMatch(/^\s+hive:/m);
+    expect(composeLocal).toMatch(/^\s+dashboard:/m);
+  });
+
+  it('sets LOCAL_MODE=true on hive service', () => {
+    expect(composeLocal).toContain("LOCAL_MODE: 'true'");
+  });
+
+  it('sets LOCALSTACK_ENDPOINT to localstack service name for inter-container networking', () => {
+    expect(composeLocal).toContain('LOCALSTACK_ENDPOINT: http://localstack:4566');
+  });
+
+  it('hive depends on localstack with health check', () => {
+    expect(composeLocal).toContain('condition: service_healthy');
+  });
+
+  it('uses localstack/localstack:3.4 image', () => {
+    expect(composeLocal).toContain('localstack/localstack:3.4');
+  });
+
+  it('mounts localstack init script', () => {
+    expect(composeLocal).toContain('localstack-init.sh');
+  });
+
+  it('sets required environment variables on hive service', () => {
+    const requiredEnvVars = [
+      'ANTHROPIC_API_KEY',
+      'GITHUB_TOKEN',
+      'RUN_ID',
+      'DYNAMODB_TABLE',
+      'EVENTBRIDGE_BUS',
+      'REPO_URLS',
+      'REQUIREMENT_TITLE',
+      'REQUIREMENT_DESCRIPTION',
+    ];
+    for (const envVar of requiredEnvVars) {
+      expect(composeLocal).toContain(envVar);
+    }
+  });
+
+  it('exposes dashboard on port 3000', () => {
+    expect(composeLocal).toContain("'3000:3000'");
+  });
+
+  it('exposes localstack on port 4566', () => {
+    expect(composeLocal).toContain("'4566:4566'");
+  });
+
+  it('declares named volumes', () => {
+    expect(composeLocal).toMatch(/^volumes:/m);
+    expect(composeLocal).toContain('localstack-data');
+    expect(composeLocal).toContain('hive-workspace');
+    expect(composeLocal).toContain('hive-agent-logs');
+  });
+
+  it('references the infra/Dockerfile for hive and dashboard', () => {
+    expect(composeLocal).toContain('infra/Dockerfile');
   });
 });

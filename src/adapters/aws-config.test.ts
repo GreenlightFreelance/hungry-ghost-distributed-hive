@@ -1,7 +1,7 @@
 // Licensed under the Hungry Ghost Hive License. See LICENSE.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getAWSConfig, isLocalMode } from './aws-config.js';
+import { getAWSConfig, getLocalStackEndpoint, isLocalMode } from './aws-config.js';
 
 describe('aws-config', () => {
   const originalEnv = process.env;
@@ -10,6 +10,7 @@ describe('aws-config', () => {
     process.env = { ...originalEnv };
     delete process.env.LOCAL_MODE;
     delete process.env.AWS_REGION;
+    delete process.env.LOCALSTACK_ENDPOINT;
   });
 
   afterEach(() => {
@@ -68,6 +69,24 @@ describe('aws-config', () => {
       const config = getAWSConfig('eu-west-1');
       expect(config.region).toBe('eu-west-1');
       expect(config.endpoint).toBe('http://localhost:4566');
+    });
+
+    it('uses LOCALSTACK_ENDPOINT env var when set in LOCAL_MODE', () => {
+      process.env.LOCAL_MODE = 'true';
+      process.env.LOCALSTACK_ENDPOINT = 'http://localstack:4566';
+      const config = getAWSConfig();
+      expect(config.endpoint).toBe('http://localstack:4566');
+    });
+  });
+
+  describe('getLocalStackEndpoint', () => {
+    it('returns default endpoint when LOCALSTACK_ENDPOINT is not set', () => {
+      expect(getLocalStackEndpoint()).toBe('http://localhost:4566');
+    });
+
+    it('returns custom endpoint from LOCALSTACK_ENDPOINT env var', () => {
+      process.env.LOCALSTACK_ENDPOINT = 'http://localstack:4566';
+      expect(getLocalStackEndpoint()).toBe('http://localstack:4566');
     });
   });
 });

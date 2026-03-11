@@ -51,14 +51,26 @@ describe('entrypoint.sh', () => {
     expect(entrypoint).toMatch(/^#!\/bin\/bash\nset -euo pipefail/m);
   });
 
-  it('fetches ANTHROPIC_API_KEY from Secrets Manager', () => {
+  it('fetches ANTHROPIC_API_KEY from Secrets Manager when not in LOCAL_MODE', () => {
     expect(entrypoint).toContain('ANTHROPIC_API_KEY=$(aws secretsmanager get-secret-value');
     expect(entrypoint).toContain('ANTHROPIC_KEY_ARN');
   });
 
-  it('fetches GITHUB_TOKEN from Secrets Manager', () => {
+  it('fetches GITHUB_TOKEN from Secrets Manager when not in LOCAL_MODE', () => {
     expect(entrypoint).toContain('GITHUB_TOKEN=$(aws secretsmanager get-secret-value');
     expect(entrypoint).toContain('GITHUB_TOKEN_ARN');
+  });
+
+  it('detects LOCAL_MODE and skips Secrets Manager calls', () => {
+    expect(entrypoint).toContain('LOCAL_MODE');
+    expect(entrypoint).toContain('skipping Secrets Manager');
+  });
+
+  it('uses env var API keys directly in LOCAL_MODE', () => {
+    // In LOCAL_MODE, ANTHROPIC_API_KEY and GITHUB_TOKEN are set from env vars
+    expect(entrypoint).toMatch(/LOCAL_MODE.*true/);
+    expect(entrypoint).toContain('ANTHROPIC_API_KEY=');
+    expect(entrypoint).toContain('GITHUB_TOKEN=');
   });
 
   it('configures git credentials', () => {

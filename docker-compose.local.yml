@@ -1,0 +1,81 @@
+services:
+  localstack:
+    image: localstack/localstack:3.4
+    container_name: hive-localstack
+    ports:
+      - '4566:4566'
+    environment:
+      - SERVICES=dynamodb,sqs,events,s3,secretsmanager
+      - DEFAULT_REGION=us-east-1
+      - DEBUG=0
+    volumes:
+      - './infra/localstack-init.sh:/etc/localstack/init/ready.d/init.sh'
+      - 'localstack-data:/var/lib/localstack'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hive:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    container_name: hive-local
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      # LOCAL_MODE skips Secrets Manager, uses env vars directly
+      LOCAL_MODE: 'true'
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      # API keys — override these with real keys for actual runs
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-sk-ant-local-placeholder}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-ghp-local-placeholder}
+      # Stub ARNs (not used in LOCAL_MODE but required by env validation)
+      ANTHROPIC_KEY_ARN: arn:aws:secretsmanager:us-east-1:000000000000:secret:anthropic-api-key
+      GITHUB_TOKEN_ARN: arn:aws:secretsmanager:us-east-1:000000000000:secret:github-token
+      # AWS config for LocalStack
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # Run configuration
+      RUN_ID: ${RUN_ID:-local-run-001}
+      DYNAMODB_TABLE: ${DYNAMODB_TABLE:-distributed-hive-state}
+      EVENTBRIDGE_BUS: ${EVENTBRIDGE_BUS:-distributed-hive-events}
+      # Repository URLs (JSON array)
+      REPO_URLS: ${REPO_URLS:-[]}
+      # Requirement
+      REQUIREMENT_TITLE: ${REQUIREMENT_TITLE:-Local test requirement}
+      REQUIREMENT_DESCRIPTION: ${REQUIREMENT_DESCRIPTION:-Testing the distributed hive locally with LocalStack}
+      # Optional config override
+      HIVE_CONFIG_OVERRIDE: ${HIVE_CONFIG_OVERRIDE:-}
+    volumes:
+      - hive-workspace:/workspace
+      - hive-agent-logs:/opt/hive/logs
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    container_name: hive-dashboard
+    depends_on:
+      localstack:
+        condition: service_healthy
+    command: ['node', '/opt/hive/dist/index.js', 'dashboard', '--port', '3000']
+    ports:
+      - '3000:3000'
+    environment:
+      LOCAL_MODE: 'true'
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      DYNAMODB_TABLE: ${DYNAMODB_TABLE:-distributed-hive-state}
+    restart: unless-stopped
+
+volumes:
+  localstack-data:
+  hive-workspace:
+  hive-agent-logs:
