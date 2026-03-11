@@ -177,7 +177,7 @@ describe('EcsStack', () => {
         PolicyDocument: Match.objectLike({
           Statement: Match.arrayWith([
             Match.objectLike({
-              Action: Match.arrayWith(['dynamodb:BatchGetItem', 'dynamodb:PutItem']),
+              Action: Match.arrayWith(['dynamodb:PutItem', 'dynamodb:GetItem', 'dynamodb:Query']),
             }),
           ]),
         }),
