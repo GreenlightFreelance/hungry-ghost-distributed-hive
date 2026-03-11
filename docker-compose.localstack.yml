@@ -1,0 +1,21 @@
+services:
+  localstack:
+    image: localstack/localstack:3.4
+    container_name: distributed-hive-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=dynamodb,sqs,events,s3,secretsmanager
+      - DEFAULT_REGION=us-east-1
+      - DEBUG=0
+    volumes:
+      - "./infra/localstack-init.sh:/etc/localstack/init/ready.d/init.sh"
+      - "localstack-data:/var/lib/localstack"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  localstack-data:
