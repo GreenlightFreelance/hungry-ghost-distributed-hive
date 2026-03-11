@@ -105,9 +105,7 @@ describe('withValidation middleware', () => {
 
   it('returns 415 for POST with no Content-Type header', async () => {
     const handler = withValidation(successHandler);
-    const result = await handler(
-      makeEvent({ httpMethod: 'POST', body: '{"foo":"bar"}' })
-    );
+    const result = await handler(makeEvent({ httpMethod: 'POST', body: '{"foo":"bar"}' }));
     expect(result.statusCode).toBe(415);
     expect(successHandler).not.toHaveBeenCalled();
   });
@@ -167,9 +165,7 @@ describe('withValidation middleware', () => {
 
   it('can compose withAuth and withValidation', async () => {
     process.env.API_KEY = 'test-key';
-    const handler = withAuth(
-      withValidation(successHandler)
-    );
+    const handler = withAuth(withValidation(successHandler));
 
     // Missing API key
     const r1 = await handler(

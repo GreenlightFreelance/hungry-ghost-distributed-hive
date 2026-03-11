@@ -18,8 +18,7 @@ export function withAuth(handler: LambdaHandler): LambdaHandler {
       return response(401, { error: 'Authentication not configured' });
     }
 
-    const providedKey =
-      event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
+    const providedKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
 
     if (!providedKey || providedKey !== apiKey) {
       return response(401, { error: 'Unauthorized' });

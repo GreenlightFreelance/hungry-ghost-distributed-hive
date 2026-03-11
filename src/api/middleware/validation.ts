@@ -16,8 +16,7 @@ export function withValidation(handler: LambdaHandler): LambdaHandler {
     const method = event.httpMethod?.toUpperCase();
 
     if (method && METHODS_WITH_BODY.has(method)) {
-      const contentType =
-        event.headers?.['content-type'] || event.headers?.['Content-Type'] || '';
+      const contentType = event.headers?.['content-type'] || event.headers?.['Content-Type'] || '';
 
       if (!contentType.includes('application/json')) {
         return response(415, { error: 'Content-Type must be application/json' });
