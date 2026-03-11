@@ -1,9 +1,9 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation } from 'react-router-dom';
 
 const navItems = [
-  { path: "/", label: "Dashboard" },
-  { path: "/submit", label: "New Run" },
-  { path: "/settings", label: "Settings" },
+  { path: '/', label: 'Dashboard' },
+  { path: '/submit', label: 'New Run' },
+  { path: '/settings', label: 'Settings' },
 ];
 
 export function AppLayout() {
@@ -16,14 +16,14 @@ export function AppLayout() {
           Distributed Hive
         </Link>
         <nav className="flex gap-4">
-          {navItems.map((item) => (
+          {navItems.map(item => (
             <Link
               key={item.path}
               to={item.path}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 location.pathname === item.path
-                  ? "bg-hive-100 text-hive-700"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  ? 'bg-hive-100 text-hive-700'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
               {item.label}

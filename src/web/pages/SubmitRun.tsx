@@ -1,24 +1,24 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const MODEL_OPTIONS = ["Claude Opus 4.6", "Claude Sonnet 4.6", "Claude Haiku 4.5"];
+const MODEL_OPTIONS = ['Claude Opus 4.6', 'Claude Sonnet 4.6', 'Claude Haiku 4.5'];
 const SIZE_TIERS = [
-  { value: "small", label: "Small (2 vCPU, 8GB)" },
-  { value: "medium", label: "Medium (4 vCPU, 16GB)" },
-  { value: "large", label: "Large (8 vCPU, 32GB)" },
+  { value: 'small', label: 'Small (2 vCPU, 8GB)' },
+  { value: 'medium', label: 'Medium (4 vCPU, 16GB)' },
+  { value: 'large', label: 'Large (8 vCPU, 32GB)' },
 ];
 
 export function SubmitRun() {
   const navigate = useNavigate();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [repositories, setRepositories] = useState<string[]>([""]);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [repositories, setRepositories] = useState<string[]>(['']);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [model, setModel] = useState(MODEL_OPTIONS[0]!);
-  const [sizeTier, setSizeTier] = useState("medium");
+  const [sizeTier, setSizeTier] = useState('medium');
   const [submitting, setSubmitting] = useState(false);
 
-  const addRepository = () => setRepositories([...repositories, ""]);
+  const addRepository = () => setRepositories([...repositories, '']);
 
   const removeRepository = (index: number) => {
     setRepositories(repositories.filter((_, i) => i !== index));
@@ -35,9 +35,9 @@ export function SubmitRun() {
     setSubmitting(true);
 
     try {
-      const response = await fetch("/api/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
           description,
@@ -69,7 +69,7 @@ export function SubmitRun() {
             id="title"
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={e => setTitle(e.target.value)}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-hive-500 focus:border-transparent"
             placeholder="Add user authentication with OAuth2"
@@ -83,7 +83,7 @@ export function SubmitRun() {
           <textarea
             id="description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={e => setDescription(e.target.value)}
             rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-hive-500 focus:border-transparent"
             placeholder="Describe the requirements in detail..."
@@ -91,16 +91,14 @@ export function SubmitRun() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Repositories
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Repositories</label>
           <div className="space-y-2">
             {repositories.map((repo, index) => (
               <div key={index} className="flex gap-2">
                 <input
                   type="url"
                   value={repo}
-                  onChange={(e) => updateRepository(index, e.target.value)}
+                  onChange={e => updateRepository(index, e.target.value)}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-hive-500 focus:border-transparent"
                   placeholder="https://github.com/org/repo"
                 />
@@ -131,7 +129,7 @@ export function SubmitRun() {
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-sm text-gray-600 hover:text-gray-900 font-medium"
           >
-            {showAdvanced ? "Hide" : "Show"} Advanced Options
+            {showAdvanced ? 'Hide' : 'Show'} Advanced Options
           </button>
 
           {showAdvanced && (
@@ -143,10 +141,10 @@ export function SubmitRun() {
                 <select
                   id="model"
                   value={model}
-                  onChange={(e) => setModel(e.target.value)}
+                  onChange={e => setModel(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-hive-500"
                 >
-                  {MODEL_OPTIONS.map((m) => (
+                  {MODEL_OPTIONS.map(m => (
                     <option key={m} value={m}>
                       {m}
                     </option>
@@ -161,10 +159,10 @@ export function SubmitRun() {
                 <select
                   id="size"
                   value={sizeTier}
-                  onChange={(e) => setSizeTier(e.target.value)}
+                  onChange={e => setSizeTier(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-hive-500"
                 >
-                  {SIZE_TIERS.map((tier) => (
+                  {SIZE_TIERS.map(tier => (
                     <option key={tier.value} value={tier.value}>
                       {tier.label}
                     </option>
@@ -180,7 +178,7 @@ export function SubmitRun() {
           disabled={submitting || !title}
           className="w-full px-4 py-2 bg-hive-600 text-white rounded-md hover:bg-hive-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
         >
-          {submitting ? "Submitting..." : "Submit Run"}
+          {submitting ? 'Submitting...' : 'Submit Run'}
         </button>
       </form>
     </div>

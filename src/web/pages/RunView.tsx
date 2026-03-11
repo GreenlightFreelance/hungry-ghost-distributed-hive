@@ -1,28 +1,28 @@
-import { Link, useParams } from "react-router-dom";
-import { useRunStore } from "../stores/runStore";
+import { Link, useParams } from 'react-router-dom';
+import { useRunStore } from '../stores/runStore';
 
 const statusColors: Record<string, string> = {
-  done: "text-green-600",
-  merged: "text-green-600",
-  in_progress: "text-blue-600",
-  review: "text-yellow-600",
-  todo: "text-gray-400",
+  done: 'text-green-600',
+  merged: 'text-green-600',
+  in_progress: 'text-blue-600',
+  review: 'text-yellow-600',
+  todo: 'text-gray-400',
 };
 
 const statusIcons: Record<string, string> = {
-  done: "\u2713",
-  merged: "\u2713",
-  in_progress: "\u25CF",
-  review: "\u25CF",
-  todo: "\u25CB",
+  done: '\u2713',
+  merged: '\u2713',
+  in_progress: '\u25CF',
+  review: '\u25CF',
+  todo: '\u25CB',
 };
 
 const agentStatusColors: Record<string, string> = {
-  working: "bg-green-500",
-  done: "bg-green-500",
-  waiting: "bg-yellow-500",
-  idle: "bg-gray-300",
-  error: "bg-red-500",
+  working: 'bg-green-500',
+  done: 'bg-green-500',
+  waiting: 'bg-yellow-500',
+  idle: 'bg-gray-300',
+  error: 'bg-red-500',
 };
 
 export function RunView() {
@@ -51,7 +51,7 @@ export function RunView() {
           </Link>
           <h1 className="text-xl font-bold">{activeRun.title}</h1>
         </div>
-        {activeRun.status === "running" && (
+        {activeRun.status === 'running' && (
           <button className="px-4 py-2 text-red-600 border border-red-300 rounded-md hover:bg-red-50 text-sm font-medium">
             Cancel
           </button>
@@ -67,11 +67,11 @@ export function RunView() {
               <p className="text-sm text-gray-500">No stories yet.</p>
             ) : (
               <ul className="space-y-2">
-                {stories.map((story) => (
+                {stories.map(story => (
                   <li key={story.id} className="text-sm">
                     <div className="flex items-start gap-2">
-                      <span className={statusColors[story.status] ?? "text-gray-400"}>
-                        {statusIcons[story.status] ?? "\u25CB"}
+                      <span className={statusColors[story.status] ?? 'text-gray-400'}>
+                        {statusIcons[story.status] ?? '\u25CB'}
                       </span>
                       <div>
                         <span className="text-gray-600">{story.id}</span>
@@ -104,10 +104,10 @@ export function RunView() {
               <p className="text-sm text-gray-500">No agents yet.</p>
             ) : (
               <ul className="space-y-2">
-                {agents.map((agent) => (
+                {agents.map(agent => (
                   <li key={agent.id} className="flex items-center gap-2 text-sm">
                     <span
-                      className={`w-2 h-2 rounded-full ${agentStatusColors[agent.status] ?? "bg-gray-300"}`}
+                      className={`w-2 h-2 rounded-full ${agentStatusColors[agent.status] ?? 'bg-gray-300'}`}
                     />
                     <span className="text-gray-800">{agent.role}</span>
                     <span className="text-gray-400">({agent.status})</span>
@@ -126,18 +126,18 @@ export function RunView() {
               <p className="text-sm text-gray-500">No activity yet.</p>
             ) : (
               <ul className="space-y-2 max-h-96 overflow-y-auto">
-                {[...logs].reverse().map((log) => (
+                {[...logs].reverse().map(log => (
                   <li key={log.id} className="text-sm flex gap-3">
                     <span className="text-gray-400 whitespace-nowrap">
                       {new Date(log.timestamp).toLocaleTimeString()}
                     </span>
                     <span
                       className={
-                        log.level === "error"
-                          ? "text-red-600"
-                          : log.level === "warn"
-                            ? "text-yellow-600"
-                            : "text-gray-700"
+                        log.level === 'error'
+                          ? 'text-red-600'
+                          : log.level === 'warn'
+                            ? 'text-yellow-600'
+                            : 'text-gray-700'
                       }
                     >
                       {log.message}
@@ -152,10 +152,10 @@ export function RunView() {
             <section className="bg-white rounded-lg border border-yellow-200 p-4">
               <h2 className="font-semibold mb-3">Escalations</h2>
               <ul className="space-y-2">
-                {escalations.map((esc) => (
+                {escalations.map(esc => (
                   <li key={esc.id} className="text-sm">
                     <span className="text-yellow-600 mr-2">!</span>
-                    <span className="text-gray-600">{esc.storyId}:</span>{" "}
+                    <span className="text-gray-600">{esc.storyId}:</span>{' '}
                     <span className="text-gray-800">{esc.message}</span>
                   </li>
                 ))}

@@ -1,8 +1,8 @@
-export type RunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type RunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
-export type StoryStatus = "todo" | "in_progress" | "review" | "merged" | "done";
+export type StoryStatus = 'todo' | 'in_progress' | 'review' | 'merged' | 'done';
 
-export type AgentStatus = "idle" | "working" | "waiting" | "done" | "error";
+export type AgentStatus = 'idle' | 'working' | 'waiting' | 'done' | 'error';
 
 export interface Run {
   id: string;
@@ -17,7 +17,7 @@ export interface Run {
   completedAt?: string;
   estimatedCost?: number;
   actualCost?: number;
-  sizeTier: "small" | "medium" | "large";
+  sizeTier: 'small' | 'medium' | 'large';
   model: string;
 }
 
@@ -43,7 +43,7 @@ export interface LogEntry {
   timestamp: string;
   message: string;
   source: string;
-  level: "info" | "warn" | "error";
+  level: 'info' | 'warn' | 'error';
 }
 
 export interface Escalation {
