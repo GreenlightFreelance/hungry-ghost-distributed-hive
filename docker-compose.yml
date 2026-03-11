@@ -1,0 +1,33 @@
+services:
+  hive:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    environment:
+      # AWS ARNs for Secrets Manager — override with real ARNs in production
+      ANTHROPIC_KEY_ARN: ${ANTHROPIC_KEY_ARN:-arn:aws:secretsmanager:us-east-1:000000000000:secret:anthropic-api-key}
+      GITHUB_TOKEN_ARN: ${GITHUB_TOKEN_ARN:-arn:aws:secretsmanager:us-east-1:000000000000:secret:github-token}
+      # AWS credentials (for local dev, use your own profile or set these)
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      # Run configuration
+      RUN_ID: ${RUN_ID:-local-run-001}
+      DYNAMODB_TABLE: ${DYNAMODB_TABLE:-hive-runs-local}
+      EVENTBRIDGE_BUS: ${EVENTBRIDGE_BUS:-hive-events-local}
+      # Repository URLs (JSON array)
+      REPO_URLS: ${REPO_URLS:-[]}
+      # Requirement
+      REQUIREMENT_TITLE: ${REQUIREMENT_TITLE:-Local test run}
+      REQUIREMENT_DESCRIPTION: ${REQUIREMENT_DESCRIPTION:-Testing the distributed hive locally}
+      # Optional config override (YAML string)
+      HIVE_CONFIG_OVERRIDE: ${HIVE_CONFIG_OVERRIDE:-}
+    volumes:
+      - hive-workspace:/workspace
+      - hive-agent-logs:/opt/hive/logs
+    restart: unless-stopped
+
+volumes:
+  hive-workspace:
+  hive-agent-logs:

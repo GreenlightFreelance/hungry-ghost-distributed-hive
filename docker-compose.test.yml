@@ -1,0 +1,23 @@
+services:
+  test:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    command: ["npm", "test"]
+    environment:
+      NODE_ENV: test
+      # Stub values so entrypoint env-var references don't fail at build time
+      ANTHROPIC_KEY_ARN: test-arn
+      GITHUB_TOKEN_ARN: test-arn
+      AWS_REGION: us-east-1
+      RUN_ID: test-run
+      DYNAMODB_TABLE: test-table
+      EVENTBRIDGE_BUS: test-bus
+      REPO_URLS: "[]"
+      REQUIREMENT_TITLE: test
+      REQUIREMENT_DESCRIPTION: test
+      HIVE_CONFIG_OVERRIDE: ""
+    volumes:
+      - ./coverage:/opt/hive/coverage
+    # Override the entrypoint so we run tests, not the full hive lifecycle
+    entrypoint: ["node", "--experimental-vm-modules", "node_modules/.bin/vitest", "run"]
