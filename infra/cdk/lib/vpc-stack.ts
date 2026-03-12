@@ -51,6 +51,8 @@ export class VpcStack extends cdk.Stack {
     );
 
     // sg-efs: Inbound 2049 (NFS) from sg-fargate
+    // Note: the EFS SG allows inbound from Fargate, but Fargate also needs
+    // egress to EFS on port 2049 since allowAllOutbound is false
     this.efsSecurityGroup = new ec2.SecurityGroup(this, 'EfsSecurityGroup', {
       vpc: this.vpc,
       securityGroupName: 'sg-efs',
@@ -62,6 +64,12 @@ export class VpcStack extends cdk.Stack {
       this.fargateSecurityGroup,
       ec2.Port.tcp(2049),
       'Allow NFS from Fargate tasks'
+    );
+
+    this.fargateSecurityGroup.addEgressRule(
+      this.efsSecurityGroup,
+      ec2.Port.tcp(2049),
+      'Allow NFS to EFS'
     );
 
     // sg-lambda: Outbound 443 (DynamoDB, API Gateway)
