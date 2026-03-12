@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { type ConnectionStatus, useRunUpdates } from '../hooks/useRunUpdates';
 import { useRunStore } from '../stores/runStore';
-import type { Agent, Escalation, LogEntry, Run, Story } from '../types';
+import type { Agent, LogEntry, Run, Story } from '../types';
 import { KanbanBoard } from '../components/KanbanBoard';
 import { DependencyGraph } from '../components/DependencyGraph';
 
@@ -51,7 +51,7 @@ export function RunView() {
   const { id } = useParams<{ id: string }>();
   const {
     activeRun, stories, agents, logs, escalations,
-    setActiveRun, setStories, setAgents, setLogs, setEscalations,
+    setActiveRun, setStories, setAgents, setLogs,
   } = useRunStore();
   const { get, post, del } = useApi();
   const { status: wsStatus } = useRunUpdates(id ?? null);
@@ -67,12 +67,12 @@ export function RunView() {
     let cancelled = false;
     async function fetchRunData() {
       try {
-        const [run, storiesData, agentsData, logsData] = await Promise.all([
-          get<Run>(`/api/runs/${id}`), get<Story[]>(`/api/runs/${id}/stories`),
-          get<Agent[]>(`/api/runs/${id}/agents`), get<LogEntry[]>(`/api/runs/${id}/logs`),
-        ]);
+        const run = await get<Run & { stories?: Story[]; agents?: Agent[]; logs?: LogEntry[] }>(`/api/runs/${id}`);
         if (cancelled) return;
-        setActiveRun(run); setStories(storiesData); setAgents(agentsData); setLogs(logsData);
+        setActiveRun(run);
+        setStories(run.stories || []);
+        setAgents(run.agents || []);
+        setLogs(run.logs || []);
         setFetchError(null);
       } catch (err) {
         if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError'))
@@ -84,15 +84,7 @@ export function RunView() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [id, get, setActiveRun, setStories, setAgents, setLogs]);
 
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    async function fetchEscalations() {
-      try { const data = await get<Escalation[]>(`/api/runs/${id}/escalations`); if (!cancelled) setEscalations(data); } catch {}
-    }
-    fetchEscalations();
-    return () => { cancelled = true; };
-  }, [id, get, setEscalations]);
+  // Escalations are not served by a separate endpoint yet
 
   const isAtBottomRef = useRef(true);
   useEffect(() => {
