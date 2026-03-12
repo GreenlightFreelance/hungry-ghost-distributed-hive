@@ -58,7 +58,7 @@ export class ApiStack extends cdk.Stack {
 
     // Shared Lambda role for REST handlers
     const lambdaRole = new iam.Role(this, 'ApiLambdaRole', {
-      roleName: 'hive-api-role',
+      roleName: 'hive-api-lambda-role',
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaVPCAccessExecutionRole'),
@@ -128,10 +128,7 @@ export class ApiStack extends cdk.Stack {
         functionName: `distributed-hive-${route.handler}`,
         runtime: lambda.Runtime.NODEJS_20_X,
         handler: `index.handler`,
-        code: lambda.Code.fromAsset('lambda-placeholder', {
-          // Placeholder: real code bundled during CI/CD
-          exclude: ['**'],
-        }),
+        code: lambda.Code.fromAsset('lambda-placeholder'),
         environment: sharedEnv,
         role: lambdaRole,
         timeout: cdk.Duration.seconds(30),
@@ -205,9 +202,7 @@ export class ApiStack extends cdk.Stack {
       functionName: 'distributed-hive-ws-handler',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('lambda-placeholder', {
-        exclude: ['**'],
-      }),
+      code: lambda.Code.fromAsset('lambda-placeholder'),
       environment: {
         DYNAMODB_TABLE: props.table.tableName,
       },
@@ -260,9 +255,7 @@ export class ApiStack extends cdk.Stack {
       functionName: 'distributed-hive-ws-broadcaster',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('lambda-placeholder', {
-        exclude: ['**'],
-      }),
+      code: lambda.Code.fromAsset('lambda-placeholder'),
       environment: {
         DYNAMODB_TABLE: props.table.tableName,
         WEBSOCKET_ENDPOINT: this.webSocketStage.callbackUrl,
@@ -315,7 +308,7 @@ export class ApiStack extends cdk.Stack {
       functionName: 'distributed-hive-run-timeout',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('lambda-placeholder', { exclude: ['**'] }),
+      code: lambda.Code.fromAsset('lambda-placeholder'),
       environment: {
         DYNAMODB_TABLE: props.table.tableName,
         ECS_CLUSTER_ARN: props.cluster.clusterArn,
@@ -360,7 +353,7 @@ export class ApiStack extends cdk.Stack {
       functionName: 'distributed-hive-efs-cleanup',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('lambda-placeholder', { exclude: ['**'] }),
+      code: lambda.Code.fromAsset('lambda-placeholder'),
       environment: {
         EFS_MOUNT_PATH: '/mnt/efs',
         EFS_MAX_AGE_DAYS: '30',

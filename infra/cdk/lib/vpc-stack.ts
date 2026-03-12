@@ -33,7 +33,7 @@ export class VpcStack extends cdk.Stack {
     // sg-fargate: Outbound 443 (HTTPS) and 22 (git SSH)
     this.fargateSecurityGroup = new ec2.SecurityGroup(this, 'FargateSecurityGroup', {
       vpc: this.vpc,
-      securityGroupName: 'sg-fargate',
+      securityGroupName: 'distributed-hive-fargate',
       description: 'Security group for Fargate tasks',
       allowAllOutbound: false,
     });
@@ -53,7 +53,7 @@ export class VpcStack extends cdk.Stack {
     // sg-efs: Inbound 2049 (NFS) from sg-fargate
     this.efsSecurityGroup = new ec2.SecurityGroup(this, 'EfsSecurityGroup', {
       vpc: this.vpc,
-      securityGroupName: 'sg-efs',
+      securityGroupName: 'distributed-hive-efs',
       description: 'Security group for EFS mount targets',
       allowAllOutbound: false,
     });
@@ -67,7 +67,7 @@ export class VpcStack extends cdk.Stack {
     // sg-lambda: Outbound 443 (DynamoDB, API Gateway)
     this.lambdaSecurityGroup = new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
       vpc: this.vpc,
-      securityGroupName: 'sg-lambda',
+      securityGroupName: 'distributed-hive-lambda',
       description: 'Security group for Lambda functions',
       allowAllOutbound: false,
     });

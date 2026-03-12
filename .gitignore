@@ -3,6 +3,10 @@ node_modules/
 
 # Build output
 dist/
+
+# CDK
+infra/cdk/cdk.out/
+infra/cdk/cdk.context.json
 # Environment variables
 .env
 .env.local
