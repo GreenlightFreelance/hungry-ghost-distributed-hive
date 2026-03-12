@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.distributed-hive.com';
@@ -32,14 +32,10 @@ export function useApi(options: UseApiOptions = {}) {
   const token = useAuthStore(state => state.token);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   const request = useCallback(
     async <T>(path: string, opts: RequestOptions = {}): Promise<T> => {
-      // Cancel any in-flight request
-      abortControllerRef.current?.abort();
       const controller = new AbortController();
-      abortControllerRef.current = controller;
 
       setLoading(true);
       setError(null);
@@ -99,7 +95,7 @@ export function useApi(options: UseApiOptions = {}) {
   const del = useCallback(<T>(path: string) => request<T>(path, { method: 'DELETE' }), [request]);
 
   const cancel = useCallback(() => {
-    abortControllerRef.current?.abort();
+    // No-op: individual requests manage their own AbortControllers
   }, []);
 
   return { request, get, post, put, del, cancel, loading, error };

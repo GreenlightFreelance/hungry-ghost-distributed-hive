@@ -1,3 +1,120 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+
+    /* Page */
+    --color-page-bg: #f8fafc;
+    --color-text: #111827;
+    --color-text-secondary: #6b7280;
+    --color-text-muted: #9ca3af;
+
+    /* Cards & surfaces */
+    --color-card: #ffffff;
+    --color-card-border: #e5e7eb;
+    --color-card-hover: #f9fafb;
+
+    /* Inputs */
+    --color-input-bg: #ffffff;
+    --color-input-border: #d1d5db;
+    --color-input-text: #111827;
+    --color-input-placeholder: #9ca3af;
+
+    /* Labels */
+    --color-label: #374151;
+
+    /* Headings */
+    --color-heading: #111827;
+
+    /* Section headers */
+    --color-section: #9ca3af;
+
+    /* Column backgrounds */
+    --color-column-bg: rgba(241, 245, 249, 0.6);
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --color-page-bg: #0b1120;
+    --color-text: #f3f4f6;
+    --color-text-secondary: #9ca3af;
+    --color-text-muted: #6b7280;
+
+    --color-card: #151d2e;
+    --color-card-border: #1e293b;
+    --color-card-hover: #1a2234;
+
+    --color-input-bg: #151d2e;
+    --color-input-border: #374151;
+    --color-input-text: #f3f4f6;
+    --color-input-placeholder: #6b7280;
+
+    --color-label: #d1d5db;
+
+    --color-heading: #ffffff;
+
+    --color-section: #6b7280;
+
+    --color-column-bg: rgba(11, 17, 32, 0.5);
+  }
+
+  /* Custom scrollbar for dark mode */
+  .dark ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+}
+
+@layer components {
+  .card {
+    background-color: var(--color-card);
+    border-color: var(--color-card-border);
+  }
+  .card-input {
+    background-color: var(--color-input-bg);
+    border-color: var(--color-input-border);
+    color: var(--color-input-text);
+  }
+  .card-input::placeholder {
+    color: var(--color-input-placeholder);
+  }
+  .header-bg {
+    background-color: var(--color-card);
+    border-color: var(--color-card-border);
+  }
+  .column-bg {
+    background-color: var(--color-column-bg);
+  }
+  .hover-card:hover {
+    background-color: var(--color-card-hover);
+  }
+  .text-heading {
+    color: var(--color-heading);
+  }
+  .text-label {
+    color: var(--color-label);
+  }
+  .text-secondary {
+    color: var(--color-text-secondary);
+  }
+  .text-muted {
+    color: var(--color-text-muted);
+  }
+  .text-section {
+    color: var(--color-section);
+  }
+}

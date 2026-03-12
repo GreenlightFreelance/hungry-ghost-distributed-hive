@@ -1,12 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Distributed Hive</title>
+    <script>
+      // Apply theme before render to prevent flash
+      const t = localStorage.getItem('hive_theme');
+      if (t === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.style.backgroundColor = '#f8fafc';
+      } else {
+        document.documentElement.style.backgroundColor = '#0b1120';
+      }
+    </script>
   </head>
-  <body class="bg-gray-50 text-gray-900 antialiased">
+  <body class="antialiased transition-colors" style="background-color: var(--color-page-bg); color: var(--color-text)">
     <div id="root"></div>
     <script type="module" src="/main.tsx"></script>
   </body>

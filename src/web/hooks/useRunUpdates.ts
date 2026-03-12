@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useRunStore } from '../stores/runStore';
 import type { Agent, Escalation, LogEntry, Story } from '../types';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'wss://api.distributed-hive.com/ws';
+const WS_URL = import.meta.env.VITE_WS_URL || '';
 const MAX_RECONNECT_DELAY = 30_000;
 const INITIAL_RECONNECT_DELAY = 1_000;
 
@@ -65,7 +65,7 @@ export function useRunUpdates(runId: string | null) {
   );
 
   const connect = useCallback(() => {
-    if (!runId || !isMounted.current) return;
+    if (!runId || !isMounted.current || !WS_URL) return;
 
     statusRef.current = reconnectAttempt.current > 0 ? 'reconnecting' : 'connecting';
 

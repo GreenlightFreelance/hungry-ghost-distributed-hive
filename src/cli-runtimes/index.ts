@@ -127,6 +127,9 @@ export function resolveRuntimeModelForCli(model: string, cliTool: CliRuntimeType
   const normalized = model.toLowerCase();
 
   if (cliTool === 'claude') {
+    // If the model looks like a full Bedrock inference profile ID (e.g. eu.anthropic.claude-opus-4-6-v1),
+    // pass it through directly so Claude Code uses it as-is.
+    if (normalized.includes('anthropic.claude-')) return model;
     if (normalized.includes('sonnet')) return 'sonnet';
     if (normalized.includes('opus')) return 'opus';
     if (normalized.includes('haiku')) return 'haiku';

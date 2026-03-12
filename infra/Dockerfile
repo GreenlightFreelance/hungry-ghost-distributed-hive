@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     jq \
+    unzip \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
@@ -26,13 +27,19 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "aws
     && ./aws/install \
     && rm -rf awscliv2.zip aws/
 
-# Install Hive
-COPY . /opt/hive
-WORKDIR /opt/hive
-RUN npm ci && npm run build
+# Install Hive from local source
+COPY --chown=root:root . /tmp/hive-src
+RUN cd /tmp/hive-src && npm install && npm run build && npm link && rm -rf /tmp/hive-src/node_modules/.cache
+
+# Create non-root user (Claude Code refuses --dangerously-skip-permissions as root)
+RUN useradd -m -s /bin/bash hive && \
+    mkdir -p /workspace && chown hive:hive /workspace
 
 # Entry point script
 COPY infra/entrypoint.sh /opt/entrypoint.sh
 RUN chmod +x /opt/entrypoint.sh
+
+USER hive
+WORKDIR /workspace
 
 ENTRYPOINT ["/opt/entrypoint.sh"]
