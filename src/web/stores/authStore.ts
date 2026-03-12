@@ -47,10 +47,12 @@ export const storage = {
   },
 };
 
+const initialSession = storage.get();
+
 export const useAuthStore = create<AuthState>(set => ({
-  token: null,
-  user: null,
-  isAuthenticated: false,
+  token: initialSession?.token ?? null,
+  user: initialSession?.user ?? null,
+  isAuthenticated: Boolean(initialSession),
 
   login: (token, user) => {
     storage.set(token, user);

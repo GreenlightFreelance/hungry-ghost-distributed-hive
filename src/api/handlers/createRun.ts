@@ -101,7 +101,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       overrides: {
         containerOverrides: [
           {
-            name: 'hive',
+            name: 'distributed-hive',
             environment: [
               { name: 'RUN_ID', value: runId },
               { name: 'DYNAMODB_TABLE', value: DYNAMODB_TABLE },
