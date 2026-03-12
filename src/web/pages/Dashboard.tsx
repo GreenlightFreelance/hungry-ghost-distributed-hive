@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useApi } from '../hooks/useApi';
 import { useRunStore } from '../stores/runStore';
 import type { Run } from '../types';
 
@@ -70,7 +72,16 @@ function RunCard({ run }: { run: Run }) {
 }
 
 export function Dashboard() {
+  const { get } = useApi();
   const runs = useRunStore(s => s.runs);
+  const setRuns = useRunStore(s => s.setRuns);
+
+  useEffect(() => {
+    get<{ runs: Run[] }>('/api/runs')
+      .then(data => setRuns(data.runs.map(r => ({ ...r, stories: r.stories || [], agents: r.agents || [] }))))
+      .catch(() => {});
+  }, [get, setRuns]);
+
   const activeRuns = runs.filter(r => r.status === 'running' || r.status === 'pending');
   const completedRuns = runs.filter(
     r => r.status === 'completed' || r.status === 'failed' || r.status === 'cancelled'
