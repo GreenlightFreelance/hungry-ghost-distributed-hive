@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: af-south-1
+  AWS_REGION: eu-west-1
   ECR_REPOSITORY: distributed-hive
 
 jobs:
