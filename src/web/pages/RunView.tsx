@@ -68,8 +68,8 @@ export function RunView() {
     async function fetchRunData() {
       try {
         const [run, storiesData, agentsData, logsData] = await Promise.all([
-          get<Run>(`/runs/${id}`), get<Story[]>(`/runs/${id}/stories`),
-          get<Agent[]>(`/runs/${id}/agents`), get<LogEntry[]>(`/runs/${id}/logs`),
+          get<Run>(`/api/runs/${id}`), get<Story[]>(`/api/runs/${id}/stories`),
+          get<Agent[]>(`/api/runs/${id}/agents`), get<LogEntry[]>(`/api/runs/${id}/logs`),
         ]);
         if (cancelled) return;
         setActiveRun(run); setStories(storiesData); setAgents(agentsData); setLogs(logsData);
@@ -88,7 +88,7 @@ export function RunView() {
     if (!id) return;
     let cancelled = false;
     async function fetchEscalations() {
-      try { const data = await get<Escalation[]>(`/runs/${id}/escalations`); if (!cancelled) setEscalations(data); } catch {}
+      try { const data = await get<Escalation[]>(`/api/runs/${id}/escalations`); if (!cancelled) setEscalations(data); } catch {}
     }
     fetchEscalations();
     return () => { cancelled = true; };
@@ -109,14 +109,14 @@ export function RunView() {
   const handleCancel = useCallback(async () => {
     if (!id || cancelling) return;
     setCancelling(true);
-    try { await del(`/runs/${id}`); setActiveRun({ ...activeRun!, status: 'cancelled' }); } catch {} finally { setCancelling(false); }
+    try { await del(`/api/runs/${id}`); setActiveRun({ ...activeRun!, status: 'cancelled' }); } catch {} finally { setCancelling(false); }
   }, [id, cancelling, del, activeRun, setActiveRun]);
 
   const handleReply = useCallback(
     async (escalationId: string, storyId: string) => {
       if (!id || !replyText.trim() || replyLoading) return;
       setReplyLoading(true);
-      try { await post(`/runs/${id}/message`, { message: replyText.trim(), sender: 'user', escalationId, storyId }); setReplyText(''); setReplyingTo(null); } catch {} finally { setReplyLoading(false); }
+      try { await post(`/api/runs/${id}/message`, { message: replyText.trim(), sender: 'user', escalationId, storyId }); setReplyText(''); setReplyingTo(null); } catch {} finally { setReplyLoading(false); }
     }, [id, replyText, replyLoading, post]
   );
 
